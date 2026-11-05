@@ -4,7 +4,7 @@ use crate::protocol::{
     build_control_packet, build_control_packet_for_protocol, validate_dante_channel_name,
     validate_dante_channel_reference, validate_dante_name, ConmonHeader, NetaudioError,
     OPCODE_CHANNEL_COUNT, OPCODE_DEVICE_NAME_SET, OPCODE_RX_CHANNELS, OPCODE_TX_CHANNEL_INFO,
-    OPCODE_TX_CHANNEL_NAMES, PROTOCOL_ARC_2809,
+    OPCODE_TX_CHANNEL_NAMES, PROTOCOL_ARC_2809, PROTOCOL_ARC_280C,
 };
 
 pub const PROTOCOL_SETTINGS: u16 = crate::protocol::NetaudioProtocol::Settings as u16;

@@ -95,6 +95,34 @@ mod fixed_authoring_tests {
     }
 
     #[test]
+    fn behringer_wing_280c_native_create_plans_the_segmented_serializer() {
+        // Facts observed from a Behringer WING Dante card: ARC 2.8.12, capability
+        // word 0x0ff9 (bit 0x1000 clear), 64 transmit channels, 32 slots per flow.
+        let input = json!({"protocol_id":0x280C,
+            "specification":{"media_mode":"native_dante","flow_type":"multicast",
+                "channel_slots":[{"slot":1,"transmitter_channel":1},{"slot":2,"transmitter_channel":2}],
+                "identity":{"media_local_flow_id":1},"name":"test-flow"},
+            "device":{"managed":false,"locked":false,"capability_word":0x0ff9,
+                "advertised_protocol":0x280C,"sample_rate":48000,"encoding":24,
+                "channels":(1..=64).collect::<Vec<u16>>(),"channel_capacity":32,
+                "capabilities":{}}});
+        let plan = crate::flow_plan::plan_create(&serde_json::from_value(input).unwrap());
+        assert!(plan.reasons.is_empty(), "{:?}", plan.reasons);
+        assert_eq!(plan.authoring_family, Some("segmented"));
+        let command = plan.command.unwrap();
+        assert_eq!(command["command"], "create_multicast_flow_2809");
+        assert_eq!(command["protocol_id"], 0x280C);
+        let packet =
+            crate::spec::build_command_from_json(&serde_json::Value::Object(command).to_string())
+                .unwrap();
+        assert_eq!(&packet[0..2], &0x280Cu16.to_be_bytes());
+        assert_eq!(
+            &packet[6..8],
+            &crate::commands::OPCODE_CREATE_TX_FLOW_2809.to_be_bytes()
+        );
+    }
+
+    #[test]
     fn fixed_readback_preserves_flags_class_sockets_and_packet_count() {
         let mut packet = crate::spec::build_command_from_json(&request().to_string()).unwrap();
         packet[6..8].copy_from_slice(&0x2200u16.to_be_bytes());

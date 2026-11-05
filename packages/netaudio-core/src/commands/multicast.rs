@@ -55,6 +55,20 @@ pub fn build_create_multicast_flow_2809(
     specification: &MulticastFlow2809<'_>,
     message_id: u16,
 ) -> Result<Vec<u8>, NetaudioError> {
+    build_create_multicast_flow_for_protocol(PROTOCOL_ARC_2809, specification, message_id)
+}
+
+/// Encode the segmented transmitter allocation request for an ARC revision
+/// observed to share the ARC 2.8.9 layout. ARC 2.8.12 (0x280C) is
+/// capture-backed by a Dante Controller exchange with a Behringer WING.
+pub fn build_create_multicast_flow_for_protocol(
+    protocol_id: u16,
+    specification: &MulticastFlow2809<'_>,
+    message_id: u16,
+) -> Result<Vec<u8>, NetaudioError> {
+    if !matches!(protocol_id, PROTOCOL_ARC_2809 | PROTOCOL_ARC_280C) {
+        return Err(NetaudioError::InvalidFlowProtocol);
+    }
     if ![0, 0x0001, 0x0071].contains(&specification.request_options_word) {
         return Err(NetaudioError::InvalidFlowProtocol);
     }
@@ -212,12 +226,7 @@ pub fn build_create_multicast_flow_2809(
         body.extend_from_slice(&destination.address.octets());
     }
 
-    arc_packet_with_reserved_word(
-        PROTOCOL_ARC_2809,
-        OPCODE_CREATE_TX_FLOW_2809,
-        &body,
-        message_id,
-    )
+    arc_packet_with_reserved_word(protocol_id, OPCODE_CREATE_TX_FLOW_2809, &body, message_id)
 }
 
 #[cfg(test)]
@@ -235,6 +244,37 @@ mod tests {
             frames_per_packet: 0,
             destinations: &[],
         }
+    }
+
+    #[test]
+    fn arc_280c_native_create_matches_dante_controller_capture_from_behringer_wing() {
+        // Dante Controller -> Behringer WING (ARC 2.8.12), Tx 1-32 as media-local flow 32.
+        let captured = decode_hexadecimal(
+            "280c00a60013260100000000000000000101001416490000000000030020000000000002\
+             000000000000000000000000000000000000000000000000000000000a33000000000000\
+             000100000000000000000000042900000000000023250020000100020003000400050006\
+             000700080009000a000b000c000d000e000f001000110012001300140015001600170018\
+             0019001a001b001c001d001e001f0020000002000008",
+        );
+        let channels: Vec<u16> = (1..=32).collect();
+        let specification = MulticastFlow2809 {
+            channels: &channels,
+            request_options_word: 0,
+            media_local_flow_id: 0x20,
+            transport: MulticastFlowTransport::Native,
+            flow_name: None,
+            frames_per_packet: 8,
+            destinations: &[],
+        };
+        assert_eq!(
+            build_create_multicast_flow_for_protocol(PROTOCOL_ARC_280C, &specification, 0x13)
+                .unwrap(),
+            captured
+        );
+        assert_eq!(
+            build_create_multicast_flow_for_protocol(0x280F, &specification, 0x13),
+            Err(NetaudioError::InvalidFlowProtocol)
+        );
     }
 
     #[test]
