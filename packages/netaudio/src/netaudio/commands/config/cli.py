@@ -865,6 +865,73 @@ def clock_source(
     run_command(run_clock_source, selection, all_devices, device_identifiers=selected_device_identifiers())
 
 
+def _ptpv2_enabled(device):
+    return (getattr(device, "clock_status", None) or {}).get("ptpv2_enabled")
+
+
+def _ptpv2_label(device) -> str:
+    enabled = _ptpv2_enabled(device)
+    if enabled is None:
+        return "N/A"
+    return "on" if enabled else "off"
+
+
+async def _read_ptpv2(application, device):
+    parsed = await application.probe_clocking_status(device)
+    enabled = parsed.get("ptpv2_enabled")
+    if enabled is None:
+        raise RuntimeError("PTPv2 port readback was unavailable")
+    return enabled
+
+
+async def run_ptpv2(application, devices, enabled: str | None, all_devices: bool) -> None:
+    targets = select_device(filter_devices(devices), allow_many=all_devices)
+
+    if enabled is None:
+
+        async def _read_target(server_name, device):
+            await _read_ptpv2(application, device)
+
+        await _render_cached_reading(
+            targets,
+            all_devices,
+            "PTPv2",
+            "PTPv2",
+            _read_target,
+            _ptpv2_label,
+            lambda device: {"ptpv2_enabled": _ptpv2_enabled(device)},
+        )
+        return
+
+    if enabled.lower() not in ("on", "off"):
+        typer.echo("Error: expected 'on' or 'off'.", err=True)
+        raise typer.Exit(code=ExitCode.ERROR)
+
+    requested = enabled.lower() == "on"
+    failures = await _send_verified_change(
+        targets,
+        lambda device: application.set_ptpv2_enabled(device, requested),
+        requested,
+        "PTPv2 change",
+        lambda label: f"Set PTPv2 for {label}: {enabled.lower()}",
+        read_for=lambda device: _read_ptpv2(application, device),
+    )
+    if failures:
+        raise typer.Exit(code=ExitCode.ERROR)
+
+
+@app.command("ptpv2")
+def ptpv2(
+    enabled: Optional[str] = typer.Argument(None, help="on or off"),
+    all_devices: bool = typer.Option(False, "--all", help="Apply to all devices."),
+):
+    """Get or set the PTPv2 multicast clock port, independent of AES67 mode.
+
+    Some devices, such as the Behringer WING, do not keep this setting across a reboot.
+    """
+    run_command(run_ptpv2, enabled, all_devices, device_identifiers=selected_device_identifiers())
+
+
 async def run_clock_subdomain(application, devices, selection: str | None, all_devices: bool) -> None:
     targets = select_device(filter_devices(devices), allow_many=all_devices)
 

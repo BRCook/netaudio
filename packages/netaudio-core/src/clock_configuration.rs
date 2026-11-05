@@ -40,6 +40,7 @@ pub fn control_availability(status: &Value) -> crate::commands::ClockControlAvai
     availability.ptpv2_priority1 = available("ptpv2_priority1", 4);
     availability.ptpv2_priority2 = available("ptpv2_priority2", 5);
     availability.multicast_dscp = revision >= 0x073a && available("multicast_dscp", 6);
+    availability.ptpv2_enabled &= status.get("ptpv2_enabled").is_some_and(Value::is_boolean);
     availability.ports = status
         .get("extended_ports")
         .and_then(Value::as_array)
@@ -135,7 +136,8 @@ fn status_field(name: &str) -> Result<&str, &'static str> {
         | "global_unicast_delay_requests"
         | "aggregate_ptpv1_unicast_delay_requests" => Ok(name),
         "follower_only" | "priority_mapping" | "preferred_protocol" | "ptpv2_clock_class"
-        | "ptpv2_domain" | "ptpv2_priority1" | "ptpv2_priority2" | "multicast_dscp" => Ok(name),
+        | "ptpv2_domain" | "ptpv2_priority1" | "ptpv2_priority2" | "multicast_dscp"
+        | "ptpv2_enabled" => Ok(name),
         "ports" => Ok("extended_ports"),
         _ => Err("Unsupported clock settings"),
     }

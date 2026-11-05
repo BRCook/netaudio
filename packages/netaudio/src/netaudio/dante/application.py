@@ -2824,6 +2824,14 @@ class DanteApplication:
             raise RuntimeError("Preferred leader was sent but fresh readback has not confirmed it.")
         return result["status"].get("preferred_leader")
 
+    async def set_ptpv2_enabled(self, device, enabled: bool, timeout: float = 4.0) -> bool | None:
+        result = await self.set_clock_configuration(device, {"ptpv2_enabled": enabled}, timeout=timeout)
+        if not result["effective_state_confirmed"]:
+            if not self.verify_mutations:
+                return None
+            raise RuntimeError("PTPv2 change was sent but fresh readback has not confirmed it.")
+        return result["status"].get("ptpv2_enabled")
+
     async def set_sample_rate(
         self,
         device,

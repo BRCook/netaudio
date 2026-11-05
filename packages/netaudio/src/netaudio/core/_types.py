@@ -124,6 +124,7 @@ class ClockControlAvailability(_extensions.TypedDict):
     priority_mapping: bool
     ptpv2_clock_class: bool
     ptpv2_domain: bool
+    ptpv2_enabled: bool
     ptpv2_priority1: bool
     ptpv2_priority2: bool
     subdomain: bool
@@ -1078,6 +1079,7 @@ class PtpClockStatus(_extensions.TypedDict):
     ptpv2_clock_class: _typing.Union[int, None]
     ptpv2_device_identity: _typing.Union[str, None]
     ptpv2_domain: _typing.Union[int, None]
+    ptpv2_enabled: _typing.Union[bool, None]
     ptpv2_grandmaster_identity: _typing.Union[str, None]
     ptpv2_master_identity: _typing.Union[str, None]
     ptpv2_priority1: _typing.Union[int, None]
