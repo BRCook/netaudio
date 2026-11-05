@@ -146,4 +146,4 @@ The browser's Events page keeps recent events and issues in memory, and restarti
 
 NetAudio is an independent interoperability project and is not affiliated with or endorsed by Audinate. It grew out of packet capture replay and modification experiments first written up in a [Gearspace discussion](https://gearspace.com/board/music-computers/1221989-dante-routing-without-dante-controller-possible.html). The original project is by Chris Ritsen. This fork's additions were developed and tested against a Behringer WING Compact with Dante firmware 4.2.9.4.
 
-The original NetAudio is released into the public domain under the Unlicense ([LICENSE-UPSTREAM](LICENSE-UPSTREAM)). This fork, like Virgil and Headhunter, is released under the GNU Affero General Public License v3.0; see [LICENSE](LICENSE).
+The original NetAudio is released into the public domain under the Unlicense ([LICENSE-UPSTREAM](LICENSE-UPSTREAM)). This fork, like Virgil and Headhunter, is released under the GNU Affero General Public License version 3 or later; see [LICENSE](LICENSE).
