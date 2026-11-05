@@ -1,31 +1,60 @@
-*.pyc
-node_modules/
-test-results/
-playwright-report/
-.eggs
-.sw*
-/build/
-dist/
-__pycache__
-debug.log
-.hypothesis/
-docs/reference/dante-controller-subscription-status-labels.txt
-packages/netaudio/man/
-packages/netaudio-core/target/
-packages/netaudio-endpoint/target/
-/target/
-packages/netaudio/src/netaudio/bin/
-packages/netaudio/src/netaudio/core/libnetaudio_core.so
-packages/netaudio/src/netaudio/core/libnetaudio_core.dylib
-packages/netaudio/src/netaudio/core/netaudio_core.dll
-AGENTS.md
-CLAUDE.md
+From f9181e183a52f29413e3ed540db71c6d57da657f Mon Sep 17 00:00:00 2001
+From: netaudio contributor <contributor@example.invalid>
+Date: Thu, 5 Nov 2026 17:57:34 +0000
+Subject: [PATCH] Ignore local environments, IDE files, OS metadata and packet
+ captures
 
-# Research notes and lab results stay outside the repository
-research/
+---
+ .gitignore | 40 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-packages/netaudio/src/netaudio/_build_info.json
-
-containers/.env
-
-!packages/netaudio-daemon/src/capture/schema.sql
+diff --git a/.gitignore b/.gitignore
+index 3a26c8f..ce79eb3 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -29,3 +29,43 @@ packages/netaudio/src/netaudio/_build_info.json
+ containers/.env
+ 
+ !packages/netaudio-daemon/src/capture/schema.sql
++
++# ---------------------------------------------------------------------------
++# Fork additions. Kept below the upstream entries so rebases merge cleanly.
++# ---------------------------------------------------------------------------
++
++# Python environments, packaging and tool caches
++.venv/
++venv/
++*.egg-info/
++.pytest_cache/
++.ruff_cache/
++.mypy_cache/
++.coverage
++.coverage.*
++htmlcov/
++
++# Rust editor backups
++**/*.rs.bk
++
++# IDEs and editors
++.idea/
++*.iml
++.vscode/
++.fleet/
++.zed/
++*~
++*.kate-swp
++
++# Desktop and OS metadata
++.directory
++.DS_Store
++Thumbs.db
++
++# Local secrets and environment overrides
++.env
++.env.*
++
++# Packet captures can contain private network details
++*.pcap
++*.pcapng
+-- 
+2.43.0

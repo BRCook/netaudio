@@ -1,5 +1,8 @@
 # NetAudio — unofficial Dante Controller alternative
 
+> [!INFO]
+> This is a fork of Chris Ritsen's [network-audio-controller](https://github.com/chris-ritsen/network-audio-controller) and is intended for use with [Virgil](https://github.com/BRCook/dante-virgil) and [Headhunter](https://github.com/BRCook/wing-headhunter)
+
 NetAudio is an unofficial Dante Controller alternative for discovering,
 routing, configuring, and monitoring Dante network audio devices. The project
 provides open-source command-line tools, a web interface, a persistent daemon,
