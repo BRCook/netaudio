@@ -244,7 +244,9 @@ function OnOffSelect({ reference, onChange, label }) {
   </select>`;
 }
 
-const CLOCK_REFRESH_INTERVAL_MS = 5000;
+// Well inside the 10-second freshness window, so a single lost reply does not
+// hide the controls.
+const CLOCK_REFRESH_INTERVAL_MS = 3000;
 
 function ClockingControls({ device, requestName }) {
   const preferred = useRef(null);
@@ -262,7 +264,14 @@ function ClockingControls({ device, requestName }) {
   // keep it fresh while these controls are on screen instead of hiding them.
   useEffect(() => {
     if (managed || !clockReadable || !requestName) return undefined;
-    const refresh = () => api.refreshClock(requestName).catch(() => {});
+    let inFlight = false;
+    const refresh = () => {
+      if (inFlight) return;
+      inFlight = true;
+      api.refreshClock(requestName).catch(() => {}).finally(() => {
+        inFlight = false;
+      });
+    };
     if (!format.clockStatusFresh(device)) refresh();
     const timer = setInterval(refresh, CLOCK_REFRESH_INTERVAL_MS);
     return () => clearInterval(timer);
