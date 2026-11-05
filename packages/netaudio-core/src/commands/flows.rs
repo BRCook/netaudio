@@ -160,7 +160,14 @@ mod fixed_authoring_tests {
         for record in records {
             let request =
                 serde_json::from_value(json!({"protocol_id":0x280C,"record":record})).unwrap();
-            crate::flow_readback::transmit_flow_specification(&request).unwrap();
+            let specification =
+                crate::flow_readback::transmit_flow_specification(&request).unwrap();
+            let specification = serde_json::to_value(specification).unwrap();
+            assert_eq!(specification["media_mode"], "native_dante");
+            assert!(specification["observed_fields"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("media_mode")));
         }
     }
 
