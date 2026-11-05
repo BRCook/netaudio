@@ -399,10 +399,15 @@ pub fn plan_create(input: &FlowCreateRequest) -> FlowCommandPlan {
                 )
                 .collect();
 
-            json!({"command": "create_multicast_flow_2809", "protocol_id": input.protocol_id, "channels": channels,
+            let mut command = json!({"command": "create_multicast_flow_2809", "channels": channels,
                 "media_local_flow_id": request.identity.media_local_flow_id, "transport": transport,
                 "flow_name": request.name, "frames_per_packet": request.frames_per_packet.map_or(0, |value| value.get()),
-                "destinations": destinations, "request_options_word": request_options_word.cloned().unwrap_or(json!(0))})
+                "destinations": destinations, "request_options_word": request_options_word.cloned().unwrap_or(json!(0))});
+            // 2.8.9 commands keep their existing shape; the serializer defaults to 0x2809.
+            if input.protocol_id == Some(crate::protocol::PROTOCOL_ARC_280C) {
+                command["protocol_id"] = json!(crate::protocol::PROTOCOL_ARC_280C);
+            }
+            command
         }
         (_, Some(crate::commands::PROTOCOL_DANTE_FLOW_2801)) => {
             plan.reject("this revision has no digest-bound create request/acknowledgement fixture");
