@@ -170,6 +170,16 @@ pub struct FlowInventoryProtocolFacts {
 pub fn flow_inventory_protocol(
     facts: FlowInventoryProtocolFacts,
 ) -> Result<Option<u16>, &'static str> {
+    // ARC 2.8.12 (0x280C) WING Dante cards answer a 0x2801 transmitter flow
+    // query only while no flows exist; Dante Controller reads their flows with
+    // the advertised 0x280C revision, so prefer it over an observed legacy id.
+    if !facts.managed {
+        if let Ok(Some(advertised)) = arc_protocol(facts.version.as_deref(), false) {
+            if advertised.protocol_id == PROTOCOL_ARC_280C {
+                return Ok(Some(PROTOCOL_ARC_280C));
+            }
+        }
+    }
     if let Some(observed) = facts.observed {
         return arc_protocol_for_identifier(observed, facts.managed)
             .map(|protocol| Some(protocol.protocol_id));

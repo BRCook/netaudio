@@ -123,6 +123,58 @@ mod fixed_authoring_tests {
     }
 
     #[test]
+    fn behringer_wing_280c_transmitter_flow_page_parses_and_converts() {
+        // Dante Controller 0x2600 readback from a Behringer WING (ARC 2.8.12)
+        // holding two 32-channel multicast flows numbered 31 and 32 while
+        // reporting 16 flow slots.
+        let response = crate::test_support::decode_hexadecimal(concat!(
+            "280c017c0015260000010000000000001002004000e000000000000000000000000000000000",
+            "0000000000000000000000003331000000000000bb80000000181649001f00000003001f0000",
+            "000000020000000000320038000f4240000000000000000000000000000000000a3300000000",
+            "00000001000000000000000000000429010000d4000023250020002100220023002400250026",
+            "002700280029002a002b002c002d002e002f0030003100320033003400350036003700380039",
+            "003a003b003c003d003e003f004000000200000800000802000000000000333200001649002000",
+            "00000300200000000000020000000000dc0038000f4240000000000000000000000000000000",
+            "000a33000000000000000100000000000000000000042901010174000023250020000100020003",
+            "000400050006000700080009000a000b000c000d000e000f0010001100120013001400150016",
+            "001700180019001a001b001c001d001e001f00200000020000080000080210e1efff5b75"
+        ));
+        let mut inventory = crate::flow_inventory::FlowInventory::new(
+            crate::flow_inventory::FlowDirection::Transmitter,
+            crate::protocol::PROTOCOL_ARC_280C,
+            8,
+        )
+        .unwrap();
+        inventory.accept(&response).unwrap();
+        let state = serde_json::to_value(inventory.state()).unwrap();
+        let records = state["inventory"]["flows"].as_array().unwrap().clone();
+        assert_eq!(records.len(), 2);
+        assert!(crate::flow_readback::inventory_complete(
+            state["inventory"].clone()
+        ));
+        let ids: Vec<_> = records
+            .iter()
+            .map(|r| r["global_flow_id"].clone())
+            .collect();
+        assert_eq!(ids, vec![json!(31), json!(32)]);
+        for record in records {
+            let request =
+                serde_json::from_value(json!({"protocol_id":0x280C,"record":record})).unwrap();
+            crate::flow_readback::transmit_flow_specification(&request).unwrap();
+        }
+    }
+
+    #[test]
+    fn behringer_wing_280c_prefers_advertised_flow_inventory_protocol() {
+        let protocol = crate::protocol::flow_inventory_protocol(
+            serde_json::from_value(json!({"observed":0x2801,"version":"2.8.12","managed":false}))
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(protocol, Some(crate::protocol::PROTOCOL_ARC_280C));
+    }
+
+    #[test]
     fn fixed_readback_preserves_flags_class_sockets_and_packet_count() {
         let mut packet = crate::spec::build_command_from_json(&request().to_string()).unwrap();
         packet[6..8].copy_from_slice(&0x2200u16.to_be_bytes());

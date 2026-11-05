@@ -184,10 +184,14 @@ pub fn parse_transmitter_flow_status_page(response: &[u8]) -> Option<Transmitter
             parse_transmitter_flow_status_record(response, record_pointer)
         },
     )?;
+    // ARC 2.8.12 (0x280C) Behringer WING Dante cards report 16 transmit flow
+    // slots but number their flows by media-local identifier (Dante Controller
+    // allocates 32, 31, ...), so global identifiers can exceed the slot count.
+    let bounded_flow_identifiers = envelope.protocol_id != crate::protocol::PROTOCOL_ARC_280C;
     let mut flow_numbers = HashSet::with_capacity(flows.len());
     let mut media_identities = HashSet::with_capacity(flows.len());
     for flow in &flows {
-        if flow.global_flow_id > u16::from(maximum_flow_slots)
+        if (bounded_flow_identifiers && flow.global_flow_id > u16::from(maximum_flow_slots))
             || !flow_numbers.insert(flow.global_flow_id)
             || !media_identities.insert((flow.media_type_code, flow.media_local_flow_id))
         {
