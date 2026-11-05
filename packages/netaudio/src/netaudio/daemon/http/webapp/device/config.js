@@ -4,7 +4,7 @@ import { api } from "../api.js";
 import { AsyncButton, FieldRow, Panel } from "../components.js";
 import * as format from "../format.js";
 import { t } from "../i18n.js";
-import { html, useRef, useState } from "../lib/preact.js";
+import { html, useEffect, useRef, useState } from "../lib/preact.js";
 import { deviceRequestName } from "../store.js";
 import {
   operationWritable,
@@ -244,6 +244,8 @@ function OnOffSelect({ reference, onChange, label }) {
   </select>`;
 }
 
+const CLOCK_REFRESH_INTERVAL_MS = 5000;
+
 function ClockingControls({ device, requestName }) {
   const preferred = useRef(null);
   const source = useRef(null);
@@ -255,6 +257,16 @@ function ClockingControls({ device, requestName }) {
   const allowed = device.clock_control_availability || {};
   const fresh = format.clockStatusFresh(device);
   const managed = isEnrolled(device);
+  const clockReadable = device.online !== false && device.clock_status?.status_supported === true;
+  // Some devices (the Behringer WING) publish clock status only when asked, so
+  // keep it fresh while these controls are on screen instead of hiding them.
+  useEffect(() => {
+    if (managed || !clockReadable || !requestName) return undefined;
+    const refresh = () => api.refreshClock(requestName).catch(() => {});
+    if (!format.clockStatusFresh(device)) refresh();
+    const timer = setInterval(refresh, CLOCK_REFRESH_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [requestName, managed, clockReadable]);
   if (managed) {
     return html`<${Panel} title=${t("Clocking")}>
       <${FieldRow} label=${t("Preferred leader")}>

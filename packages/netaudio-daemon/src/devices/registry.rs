@@ -562,7 +562,18 @@ impl DeviceRegistry {
                     _ => None,
                 };
 
+                // Reading encoding status is harmless even where encoding is not
+                // configurable, and it is the only encoding source for devices
+                // whose channel metadata omits supported encodings (the WING).
+                let encoding_unknown = matches!(query, StatusQuery::Encoding)
+                    && state
+                        .record
+                        .properties
+                        .get("encoding")
+                        .is_none_or(Value::is_null);
+
                 if let Some(capability) = required_capability
+                    && !encoding_unknown
                     && state
                         .record
                         .properties

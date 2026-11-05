@@ -240,6 +240,22 @@ mod fixed_authoring_tests {
     }
 
     #[test]
+    fn behringer_wing_280c_offers_the_media_local_identity_field() {
+        let wing = crate::parser::transmit_flow_authoring_profile(0x0ff9, Some(0x280C));
+        assert_eq!(
+            (wing.family, wing.identity_field),
+            ("segmented", "media_local_flow_id")
+        );
+        let fixed = crate::parser::transmit_flow_authoring_profile(0x0ff9, Some(0x2809));
+        assert_eq!(
+            (fixed.family, fixed.identity_field),
+            ("fixed", "global_flow_id")
+        );
+        let segmented = crate::parser::transmit_flow_authoring_profile(0x1030, None);
+        assert_eq!(segmented.family, "segmented");
+    }
+
+    #[test]
     fn behringer_wing_280c_prefers_advertised_flow_inventory_protocol() {
         let protocol = crate::protocol::flow_inventory_protocol(
             serde_json::from_value(json!({"observed":0x2801,"version":"2.8.12","managed":false}))
