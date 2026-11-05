@@ -436,6 +436,21 @@ pub fn delete_authoring_family(capability_word: u64) -> &'static str {
     }
 }
 
+/// Transmit-flow authoring family for a device. ARC 2.8.12 (0x280C) WING
+/// Dante cards report capability word 0x0ff9 (bit 0x1000 clear) yet are
+/// authored and deleted with the segmented form, as captured from Dante
+/// Controller, so 0x280C always selects the segmented family.
+pub fn transmit_flow_authoring_family(
+    capability_word: u64,
+    protocol_id: Option<u16>,
+) -> &'static str {
+    if protocol_id == Some(crate::protocol::PROTOCOL_ARC_280C) {
+        "segmented"
+    } else {
+        delete_authoring_family(capability_word)
+    }
+}
+
 pub fn plan_delete(request: &FlowDeleteRequest) -> FlowCommandPlan {
     let mut plan = FlowCommandPlan {
         reasons: request.device.reasons(true),
@@ -446,9 +461,13 @@ pub fn plan_delete(request: &FlowDeleteRequest) -> FlowCommandPlan {
         .capability_word
         .as_ref()
         .and_then(Value::as_u64)
-        .map(delete_authoring_family);
+        .map(|word| transmit_flow_authoring_family(word, request.protocol_id));
     match request.protocol_id {
-        Some(crate::commands::PROTOCOL_DANTE_FLOW | crate::protocol::PROTOCOL_ARC_2809) => {}
+        Some(
+            crate::commands::PROTOCOL_DANTE_FLOW
+            | crate::protocol::PROTOCOL_ARC_2809
+            | crate::protocol::PROTOCOL_ARC_280C,
+        ) => {}
         Some(crate::commands::PROTOCOL_DANTE_FLOW_2801) => {
             plan.reject("this revision has no digest-bound delete request/acknowledgement fixture");
         }
