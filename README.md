@@ -5,17 +5,6 @@ routing, configuring, and monitoring Dante network audio devices. The project
 provides open-source command-line tools, a web interface, a persistent daemon,
 and a protocol library for Linux, macOS, and Windows.
 
-NetAudio is a native Dante Controller alternative for iOS and iPadOS,
-available now for iPhone and iPad through
-[TestFlight](https://testflight.apple.com/join/GcuDerST). The app communicates
-directly with Dante devices for live discovery, audio subscription routing,
-device and channel configuration, live device metering, clock and status
-monitoring, and diagnostics. Local direct-device control runs on the
-phone or tablet without a separate computer, remote desktop session, or NetAudio
-daemon. The app also supports Dante Domain Manager (DDM) networks and connections
-to a NetAudio daemon.
-
-[Website and iOS app](https://netaudio.app/) ·
 [Install the CLI and web interface](#installation) ·
 [Quick start](#quick-start)
 
@@ -23,11 +12,10 @@ to a NetAudio daemon.
 
 NetAudio serves both interactive device control and software automation. A
 shared Rust protocol core implements Dante packet encoding and parsing for the
-Python application and native iOS client.
+Python application.
 
 | Interface | Use |
 | --- | --- |
-| Native iOS/iPadOS app | Discover, route, configure, and monitor devices from an iPhone or iPad using direct control or a NetAudio daemon. Available as a TestFlight beta. |
 | Command-line interface (CLI) | Inspect devices, manage subscriptions and settings, apply presets, and integrate with scripts using structured JSON output. Supports direct device access and daemon integration. |
 | Web interface | Control and monitor the network in a browser, served by the NetAudio daemon. |
 | Background daemon | Maintain network discovery, device inventory, monitoring, event history, and control services across client sessions. |
@@ -107,12 +95,6 @@ Device capabilities and the selected control transport determine which
 operations are available.
 
 ## Installation
-
-### iOS and iPadOS (iPhone and iPad)
-
-Install the native NetAudio iOS/iPadOS app through
-[TestFlight](https://testflight.apple.com/join/GcuDerST). See
-[netaudio.app](https://netaudio.app/) for app information and support.
 
 ### Linux, macOS, and Windows
 
