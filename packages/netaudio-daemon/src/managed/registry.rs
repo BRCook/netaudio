@@ -5,7 +5,8 @@ use super::{
     Credential, Error, Limits, Transport,
     client::Client,
     configuration::{Server, Settings},
-    inventory::{InventoryState, freshness},
+    discovery::DiscoveryState,
+    inventory::InventoryState,
     store::{Snapshot, Store},
 };
 use crate::state::ReadModel;
@@ -49,6 +50,7 @@ struct State {
 struct Entry {
     source: Arc<Source>,
     inventory: InventoryState,
+    discovery: DiscoveryState,
     signals: BTreeMap<String, Value>,
     controller_status: super::status::observations::Cache,
 }
@@ -403,9 +405,11 @@ impl Registry {
             domains: entry
                 .inventory
                 .domains(name, &state.snapshot.settings.contexts),
-            devices: entry
-                .inventory
-                .observations(name, &state.snapshot.settings.contexts),
+            devices: entry.inventory.observations(
+                name,
+                &state.snapshot.settings.contexts,
+                &entry.discovery,
+            ),
         })
     }
 
@@ -490,9 +494,31 @@ impl Registry {
             return Ok(false);
         }
         let permit = source.refresh.try_acquire().map_err(|_| Error::Busy)?;
+        self.refresh_acquired(name, &source, permit).await
+    }
+
+    pub(super) async fn refresh_queued(&self, name: &str) -> Result<bool, Error> {
+        let source = self.source(name)?;
+        if !source.enabled() {
+            return Ok(false);
+        }
+        let permit = source
+            .refresh
+            .acquire()
+            .await
+            .map_err(|_| Error::Conflict("Managed inventory refresh is closed"))?;
+        self.refresh_acquired(name, &source, permit).await
+    }
+
+    async fn refresh_acquired(
+        &self,
+        name: &str,
+        source: &Arc<Source>,
+        permit: tokio::sync::SemaphorePermit<'_>,
+    ) -> Result<bool, Error> {
         {
             let mut state = self.lock()?;
-            let entry = current_entry(&mut state, name, &source)?;
+            let entry = current_entry(&mut state, name, source)?;
             entry.inventory.attempting();
             self.publish_locked(&mut state)
                 .map_err(|_| Error::Conflict("Managed inventory could not be published"))?;
@@ -507,13 +533,9 @@ impl Registry {
         let accepted;
         {
             let mut state = self.lock()?;
-            let entry = current_entry(&mut state, name, &source)?;
+            let entry = current_entry(&mut state, name, source)?;
             match result {
-                Ok((response, inventory)) => match entry.inventory.apply(
-                    response,
-                    inventory,
-                    freshness(&source.configuration),
-                ) {
+                Ok((response, inventory)) => match entry.inventory.apply(response, inventory) {
                     Ok(result) => accepted = result,
                     Err(error) => {
                         entry.inventory.fail(&error);
@@ -560,9 +582,11 @@ impl Registry {
                     &entry.source.configuration,
                     entry.source.enabled(),
                     contexts,
+                    &entry.discovery,
                 );
                 status["refreshing"] = json!(entry.source.refresh.available_permits() == 0);
                 status["signal_sessions"] = json!(entry.signals);
+                status["discovery"] = entry.discovery.status();
                 (name.clone(), status)
             })
             .collect();
@@ -602,7 +626,8 @@ impl Registry {
         let mut observations = Vec::new();
         let mut controller_status = Vec::new();
         for (name, entry) in &mut state.servers {
-            let source_observations = entry.inventory.observations(name, contexts);
+            let source_observations =
+                entry.inventory.observations(name, contexts, &entry.discovery);
             controller_status.extend(entry.controller_status.project(&source_observations, now)?);
             observations.extend(source_observations);
         }
@@ -611,7 +636,6 @@ impl Registry {
             .values()
             .flat_map(|entry| {
                 [
-                    entry.inventory.deadline_after(now),
                     entry.controller_status.deadline_after(now),
                     entry
                         .source
@@ -721,6 +745,7 @@ impl Registry {
                             transport: None,
                         });
                         entry.controller_status = super::status::observations::Cache::default();
+                        entry.discovery = DiscoveryState::default();
                     }
                     self.publish_locked(&mut state)?;
                     self.signal_changes.send_replace(());
@@ -887,6 +912,7 @@ fn entries(
                 Entry {
                     source: Arc::new(source),
                     inventory,
+                    discovery: DiscoveryState::default(),
                     signals: BTreeMap::new(),
                     controller_status: super::status::observations::Cache::default(),
                 },

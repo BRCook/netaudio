@@ -23,6 +23,7 @@ const OBSERVED_CONTROLLER_TOKEN_BYTES: usize = 43;
 const OBSERVED_API_KEY_BYTES: usize = 36;
 const MAX_FRAME_PAYLOAD_BYTES: usize = 1024 * 1024;
 const DEVICE_SERVICE_MESSAGE: u16 = 0x200B;
+const DEVICE_LOOKUP_COMPONENT: u16 = 0x000D;
 const DEVICE_TARGET_SELECTOR_DISTANCE_FROM_SERVICE_NAME: usize = 26;
 const ARC_MESSAGE: u16 = 0x2004;
 const SETTINGS_REQUEST: u16 = 0x2002;
@@ -418,7 +419,7 @@ pub fn parse_session_description(bytes: &[u8]) -> Option<SessionDescription> {
         || frame.message_type != SESSION_DESCRIPTION
         || bytes.len() < 82
         || read_u16(bytes, 12)? != 0x0018
-        || read_u16(bytes, 36)? != 0x007C
+        || usize::from(read_u16(bytes, 36)?) != bytes.len() - 36
         || read_u16(bytes, 42)? != 0x000C
         || read_u16(bytes, 44)? != 0x0003
         || read_u16(bytes, 46)? != 0x0014
@@ -445,10 +446,8 @@ fn build_domain_subscription(domain_id: &[u8], subscription_id: u16) -> Option<V
         0x00, 0x2C, 0x20, 0x09, 0x00, 0x04, 0x00, 0x20, 0x00, 0x09, 0x00, 0x00,
     ]);
     payload.extend_from_slice(domain_id);
-    payload.extend_from_slice(&subscription_id.to_be_bytes());
-    payload.extend_from_slice(&[
-        0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    ]);
+    payload.extend_from_slice(&lookup_identifier(subscription_id).to_be_bytes());
+    payload.extend_from_slice(&[0; 12]);
     append_frame(NORMAL_MESSAGE, &payload)
 }
 
@@ -463,11 +462,21 @@ fn build_device_inventory_subscription(domain_id: &[u8]) -> Option<Vec<u8>> {
         0x00, 0x20, 0x00, 0x09, 0x00, 0x00,
     ]);
     payload.extend_from_slice(domain_id);
+    payload.extend_from_slice(&lookup_identifier(DEVICE_LOOKUP_COMPONENT).to_be_bytes());
     payload.extend_from_slice(&[
-        0x00, 0x0D, 0x00, 0x04, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        0x02,
+        0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
     ]);
     append_frame(NORMAL_MESSAGE, &payload)
+}
+
+fn lookup_identifier(component: u16) -> u32 {
+    u32::from(component) << 16 | 4
+}
+
+pub fn domain_lookups() -> impl Iterator<Item = (u16, u32)> {
+    (2..=LAST_INITIALIZATION_WRAPPER_ID)
+        .chain([DEVICE_LOOKUP_COMPONENT])
+        .map(|component| (component, lookup_identifier(component)))
 }
 
 pub fn build_domain_initialization(
