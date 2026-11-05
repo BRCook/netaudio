@@ -58,6 +58,22 @@ test("extended clock controls require fresh native availability and readback", (
   assert.doesNotMatch(form, /PTPv2 priority 1/);
 });
 
+test("the PTPv2 multicast control needs native availability and port readback", () => {
+  const value = device();
+  value.clock_status.ptpv2_enabled = false;
+  value.clock_control_availability = { ptpv2_enabled: true };
+  let form = render(h(DeviceConfigSection, { device: value }));
+  assert.match(form, /PTPv2 multicast[^]*?<select(?![^>]*disabled)/);
+  assert.match(form, /Current: Off/);
+  value.clock_control_availability = { ptpv2_enabled: false };
+  form = render(h(DeviceConfigSection, { device: value }));
+  assert.doesNotMatch(form, /PTPv2 multicast/);
+  value.clock_control_availability = { ptpv2_enabled: true };
+  value.clock_status.ptpv2_enabled = null;
+  form = render(h(DeviceConfigSection, { device: value }));
+  assert.doesNotMatch(form, /PTPv2 multicast/);
+});
+
 test("clock details show mute reasons", () => {
   const html = render(h(StatusSection, { device: device() }));
   assert.ok(html.includes("external-clock problem"));

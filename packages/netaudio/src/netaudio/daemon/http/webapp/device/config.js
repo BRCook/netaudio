@@ -249,6 +249,7 @@ function ClockingControls({ device, requestName }) {
   const source = useRef(null);
   const subdomain = useRef(null);
   const unicast = useRef(null);
+  const ptpv2 = useRef(null);
   const [extended, setExtended] = useState({});
   const [portChanges, setPortChanges] = useState({});
   const allowed = device.clock_control_availability || {};
@@ -279,13 +280,14 @@ function ClockingControls({ device, requestName }) {
   const named = allowed.subdomain === true;
   const perPort = allowed.aggregate_ptpv1_unicast_delay_requests === true;
   const unicastAllowed = perPort || allowed.global_unicast_delay_requests === true;
+  const ptpv2Allowed = allowed.ptpv2_enabled === true && device.clock_status?.ptpv2_enabled != null;
   const extendedFields = EXTENDED_CLOCK_FIELDS.filter(
     ([name]) => allowed[name] === true && device.clock_status?.[name] != null,
   );
   const ports = allowed.ports === true
     ? (device.clock_status?.extended_ports || []).filter((port) => port.port_id >= 1 && port.port_id <= 64)
     : [];
-  if (!preferredAllowed && !sourceAllowed && !named && !unicastAllowed && !extendedFields.length && !ports.length) {
+  if (!preferredAllowed && !sourceAllowed && !named && !unicastAllowed && !ptpv2Allowed && !extendedFields.length && !ports.length) {
     return null;
   }
   const apply = async () => {
@@ -310,6 +312,8 @@ function ClockingControls({ device, requestName }) {
           ? "aggregate_ptpv1_unicast_delay_requests"
           : "global_unicast_delay_requests"
       ] = unicast.current.value === "true";
+    if (ptpv2Allowed && ptpv2.current?.value !== "keep")
+      changes.ptpv2_enabled = ptpv2.current.value === "true";
     return api.setClockConfiguration(requestName, changes);
   };
   return html`
@@ -326,6 +330,10 @@ function ClockingControls({ device, requestName }) {
       <//>` : null}
       ${unicastAllowed ? html`<${FieldRow} label=${perPort ? t("PTPv1 unicast delay requests") : t("Unicast delay requests")}>
         <${OnOffSelect} reference=${unicast} label=${perPort ? t("PTPv1 unicast delay requests") : t("Unicast delay requests")} />
+      <//>` : null}
+      ${ptpv2Allowed ? html`<${FieldRow} label=${t("PTPv2 multicast")}>
+        <${OnOffSelect} reference=${ptpv2} label=${t("PTPv2 multicast")} />
+        <span>${t("Current")}: ${device.clock_status.ptpv2_enabled ? t("On") : t("Off")}</span>
       <//>` : null}
       ${extendedFields.length || ports.length ? html`<details><summary>${t("Advanced clock settings")}</summary>
         ${extendedFields.map(([name, label, maximum]) => html`<${FieldRow} label=${label}>

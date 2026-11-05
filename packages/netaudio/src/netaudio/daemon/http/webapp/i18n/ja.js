@@ -112,6 +112,7 @@ export default {
   "set sample rate pull-up on device": "デバイスのサンプルレートプルアップを設定",
   "Follower only": "フォロワーのみ",
   "PTPv2 domain": "PTPv2ドメイン",
+  "PTPv2 multicast": "PTPv2マルチキャスト",
   "PTPv2 priority 1": "PTPv2優先度1",
   "PTPv2 priority 2": "PTPv2優先度2",
   "Multicast DSCP": "マルチキャストDSCP",

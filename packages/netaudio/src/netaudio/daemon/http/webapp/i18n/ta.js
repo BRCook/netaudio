@@ -112,6 +112,7 @@ export default {
   "set sample rate pull-up on device": "சாதனத்தில் மாதிரி வீத புல்-அப்பை அமை",
   "Follower only": "பின்தொடர்பவர் மட்டும்",
   "PTPv2 domain": "PTPv2 டொமைன்",
+  "PTPv2 multicast": "PTPv2 மல்டிகாஸ்ட்",
   "PTPv2 priority 1": "PTPv2 முன்னுரிமை 1",
   "PTPv2 priority 2": "PTPv2 முன்னுரிமை 2",
   "Multicast DSCP": "மல்டிகாஸ்ட் DSCP",
