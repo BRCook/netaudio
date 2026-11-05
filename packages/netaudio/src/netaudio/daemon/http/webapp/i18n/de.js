@@ -112,6 +112,7 @@ export default {
   "set sample rate pull-up on device": "Abtastraten-Pull-up des Geräts einstellen",
   "Follower only": "Nur Taktnehmer",
   "PTPv2 domain": "PTPv2-Domäne",
+  "PTPv2 multicast": "PTPv2-Multicast",
   "PTPv2 priority 1": "PTPv2-Priorität 1",
   "PTPv2 priority 2": "PTPv2-Priorität 2",
   "Multicast DSCP": "Multicast-DSCP",

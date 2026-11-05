@@ -169,6 +169,8 @@ pub(super) enum CommandSpec {
         #[serde(default)]
         frames_per_packet: u16,
         media_local_flow_id: u16,
+        #[serde(default = "default_multicast_flow_protocol")]
+        protocol_id: u16,
         request_options_word: u16,
         transport: MulticastFlowTransportSpec,
         #[serde(default)]
@@ -875,6 +877,7 @@ pub(super) fn build_command(
             flow_name,
             frames_per_packet,
             media_local_flow_id,
+            protocol_id,
             request_options_word,
             transport,
             message_id,
@@ -891,7 +894,8 @@ pub(super) fn build_command(
                     })
                 })
                 .collect::<Result<Vec<_>, SpecError>>()?;
-            commands::build_create_multicast_flow_2809(
+            commands::build_create_multicast_flow_for_protocol(
+                protocol_id,
                 &commands::MulticastFlow2809 {
                     channels: &channels,
                     request_options_word,

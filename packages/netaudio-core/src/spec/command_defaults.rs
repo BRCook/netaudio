@@ -8,6 +8,10 @@ pub(super) fn default_flow_start() -> u16 {
     1
 }
 
+pub(super) fn default_multicast_flow_protocol() -> u16 {
+    crate::protocol::PROTOCOL_ARC_2809
+}
+
 pub(super) fn default_flow_protocol() -> u16 {
     commands::PROTOCOL_DANTE_FLOW
 }

@@ -339,3 +339,117 @@ fn selected_false_values_and_invalid_control_fields() {
     control.clock_source = Some(3);
     assert!(build_clock_control(&control, mac, 1).is_err());
 }
+
+// Clock status from a Behringer WING Compact (Dante 4.2.9.4, record revision
+// 0x0738) with AES67 enabled, so its multicast PTPv2 port is running. Clock
+// identities are replaced with placeholders.
+const WING_CLOCK_STATUS: [u8; 216] = [
+    7, 56, 0, 32, 0, 0, 0, 0, 0, 3, 0, 3, 0, 0, 0, 123, 0, 0, 24, 84, 0, 1, 2, 3, 4, 5, 0, 0, 2, 0,
+    0, 0, 0, 1, 0, 0, 2, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 52, 0, 6, 0, 0, 2, 180, 0, 0, 0, 3, 13, 64,
+    0, 0, 8, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 96, 12, 0, 0, 0, 0,
+    12, 0, 168, 0, 32, 0, 4, 0, 0, 0, 104, 16, 0, 0, 0, 0, 1, 1, 2, 1, 0, 0, 0, 0, 2, 0, 6, 0, 7,
+    0, 0, 0, 2, 2, 2, 1, 0, 0, 0, 0, 2, 0, 9, 0, 7, 0, 1, 0, 3, 1, 2, 2, 0, 0, 0, 0, 2, 0, 3, 0, 3,
+    0, 1, 0, 4, 2, 2, 2, 0, 0, 0, 0, 2, 0, 3, 0, 3, 0, 4, 0, 7, 0, 200, 0, 4, 0, 1, 2, 255, 254, 3,
+    4, 5, 2, 0, 0, 255, 254, 0, 0, 1, 2, 0, 0, 255, 254, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0,
+    0, 0, 1, 0, 0,
+];
+
+fn wing_clock_status(ptpv2_disabled: bool) -> Vec<u8> {
+    let mut data = vec![0; 24];
+    data.extend_from_slice(&WING_CLOCK_STATUS);
+    stamp_conmon_response(&mut data, 0x0020);
+    let records = &mut data[24..];
+    let ptpv2_multicast = records
+        .windows(4)
+        .position(|w| w == [0, 2, 2, 2])
+        .expect("PTPv2 multicast port record")
+        - 2;
+    records[ptpv2_multicast + 1] = u8::from(ptpv2_disabled);
+    data
+}
+
+#[test]
+fn wing_ptpv2_multicast_port_state_is_reported() {
+    let enabled = parse_ptp_clock_status(&wing_clock_status(false)).unwrap();
+    let ports = enabled.clock_port_records.as_ref().unwrap();
+    assert_eq!(ports.len(), 4);
+    assert_eq!(
+        (ports[1].ptp_version, ports[1].transport_path.as_deref()),
+        (2, Some("multicast"))
+    );
+    assert_eq!(enabled.ptpv2_enabled, Some(true));
+
+    let disabled = parse_ptp_clock_status(&wing_clock_status(true)).unwrap();
+    assert_eq!(
+        disabled.clock_port_records.unwrap()[1].user_disabled,
+        Some(true)
+    );
+    assert_eq!(disabled.ptpv2_enabled, Some(false));
+}
+
+#[test]
+fn wing_ptpv2_enable_plans_the_observed_control_record() {
+    let status = |disabled| {
+        serde_json::to_value(parse_ptp_clock_status(&wing_clock_status(disabled)).unwrap())
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .clone()
+    };
+    let availability = crate::clock_configuration::control_availability(&status(true).into());
+    assert!(availability.ptpv2_enabled);
+
+    let plan = crate::clock_configuration::plan_configuration(
+        serde_json::from_value(serde_json::json!({
+            "status": status(true),
+            "changes": {"ptpv2_enabled": true},
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        plan.changes.get("ptpv2_enabled"),
+        Some(&serde_json::json!(true))
+    );
+
+    // The record that switched the WING's PTPv2 multicast port on.
+    let sent = build_clock_control(
+        &serde_json::from_value(serde_json::Value::Object(plan.control)).unwrap(),
+        [0x02, 0x00, 0x5e, 0x00, 0x00, 0x01],
+        0x1234,
+    )
+    .unwrap();
+    let mut record = [0u8; 68];
+    record[0..8].copy_from_slice(&[0x07, 0x3a, 0x00, 0x21, 0x00, 0x00, 0x00, 0x64]);
+    record[32..36].copy_from_slice(&[0x00, 0x10, 0x00, 0x10]);
+    assert_eq!(sent[24..], record[..]);
+
+    assert!(crate::clock_configuration::configuration_matches(
+        &serde_json::from_value(serde_json::json!({
+            "status": status(false),
+            "requested": {"ptpv2_enabled": true},
+        }))
+        .unwrap()
+    )
+    .unwrap());
+}
+
+#[test]
+fn ptpv2_enable_requires_revision_0738_and_port_readback() {
+    let mut older = wing_clock_status(true);
+    older[24..26].copy_from_slice(&0x0734u16.to_be_bytes());
+    let older = serde_json::to_value(parse_ptp_clock_status(&older).unwrap()).unwrap();
+    assert!(!crate::clock_configuration::control_availability(&older).ptpv2_enabled);
+
+    let mut unreported =
+        serde_json::to_value(parse_ptp_clock_status(&wing_clock_status(true)).unwrap()).unwrap();
+    unreported["ptpv2_enabled"] = serde_json::Value::Null;
+    assert!(!crate::clock_configuration::control_availability(&unreported).ptpv2_enabled);
+
+    let control = ClockControl {
+        status_revision: Some(0x0734),
+        ptpv2_enabled: Some(true),
+        ..Default::default()
+    };
+    assert!(build_clock_control(&control, [0; 6], 1).is_err());
+}

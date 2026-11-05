@@ -71,31 +71,54 @@ pub struct FlowAuthoringProfile {
     pub supports_flow_options: bool,
 }
 
+fn segmented_transmit_flow_authoring() -> FlowAuthoringProfile {
+    FlowAuthoringProfile {
+        family: "segmented",
+        opcode: crate::commands::OPCODE_CREATE_TX_FLOW_2809,
+        identity_field: "media_local_flow_id",
+        identifier_max: u16::MAX,
+        media_modes: vec!["native_dante", "rtp_aes67"],
+        supports_flow_options: true,
+    }
+}
+
+fn fixed_transmit_flow_authoring() -> FlowAuthoringProfile {
+    FlowAuthoringProfile {
+        family: "fixed",
+        opcode: crate::commands::OPCODE_CREATE_TX_FLOW,
+        identity_field: "global_flow_id",
+        identifier_max: crate::commands::MAX_LEGACY_FLOW_ID,
+        media_modes: vec!["native_dante", "rtp_aes67"],
+        supports_flow_options: true,
+    }
+}
+
 pub fn flow_authoring_capabilities(capability_word: u16) -> FlowAuthoringCapabilities {
     if capability_word & 0x1000 != 0 {
         FlowAuthoringCapabilities {
-            transmit_flow_authoring: FlowAuthoringProfile {
-                family: "segmented",
-                opcode: crate::commands::OPCODE_CREATE_TX_FLOW_2809,
-                identity_field: "media_local_flow_id",
-                identifier_max: u16::MAX,
-                media_modes: vec!["native_dante", "rtp_aes67"],
-                supports_flow_options: true,
-            },
+            transmit_flow_authoring: segmented_transmit_flow_authoring(),
             receiver_flow_query_family: "segmented",
         }
     } else {
         FlowAuthoringCapabilities {
-            transmit_flow_authoring: FlowAuthoringProfile {
-                family: "fixed",
-                opcode: crate::commands::OPCODE_CREATE_TX_FLOW,
-                identity_field: "global_flow_id",
-                identifier_max: crate::commands::MAX_LEGACY_FLOW_ID,
-                media_modes: vec!["native_dante", "rtp_aes67"],
-                supports_flow_options: true,
-            },
+            transmit_flow_authoring: fixed_transmit_flow_authoring(),
             receiver_flow_query_family: "fixed",
         }
+    }
+}
+
+/// Transmit-flow authoring profile for a device whose advertised ARC protocol
+/// is known. Matches `flow_plan::transmit_flow_authoring_family`, so ARC 2.8.12
+/// (0x280C) devices such as the Behringer WING (capability word 0x0ff9) are
+/// offered the segmented, media-local form their planner requires.
+pub fn transmit_flow_authoring_profile(
+    capability_word: u16,
+    protocol_id: Option<u16>,
+) -> FlowAuthoringProfile {
+    match crate::flow_plan::transmit_flow_authoring_family(u64::from(capability_word), protocol_id)
+    {
+        "segmented" => segmented_transmit_flow_authoring(),
+        _ => fixed_transmit_flow_authoring(),
     }
 }
 

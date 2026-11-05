@@ -282,7 +282,15 @@ pub fn plan_create(input: &FlowCreateRequest) -> FlowCommandPlan {
         .capability_word
         .as_ref()
         .and_then(Value::as_u64)
-        .map(|word| word & 0x1000 != 0);
+        .map(|word| {
+            // ARC 2.8.12 (0x280C) devices such as the Behringer WING Dante card
+            // report capability word 0x0ff9 (bit 0x1000 clear), yet Dante
+            // Controller authors their transmit flows with the segmented,
+            // device-allocated form. A captured exchange shows the request is
+            // byte-identical to the ARC 2.8.9 serializer apart from the
+            // protocol identifier, so 0x280C uses the segmented family.
+            word & 0x1000 != 0 || input.protocol_id == Some(crate::protocol::PROTOCOL_ARC_280C)
+        });
     plan.authoring_family = family.map(|segmented| if segmented { "segmented" } else { "fixed" });
     let command = match (family, input.protocol_id) {
         (
@@ -338,7 +346,10 @@ pub fn plan_create(input: &FlowCreateRequest) -> FlowCommandPlan {
                     "destinations":destinations.iter().map(|d| json!({"address":d.address,"port":d.port})).collect::<Vec<_>>()}})
             }
         }
-        (Some(true), Some(crate::protocol::PROTOCOL_ARC_2809)) => {
+        (
+            Some(true),
+            Some(crate::protocol::PROTOCOL_ARC_2809 | crate::protocol::PROTOCOL_ARC_280C),
+        ) => {
             plan.serializer_cohort = Some(if matches!(request.media_mode, MediaMode::RtpAes67) {
                 "modern_2809_static_rtp_aes67"
             } else {
@@ -388,10 +399,15 @@ pub fn plan_create(input: &FlowCreateRequest) -> FlowCommandPlan {
                 )
                 .collect();
 
-            json!({"command": "create_multicast_flow_2809", "channels": channels,
+            let mut command = json!({"command": "create_multicast_flow_2809", "channels": channels,
                 "media_local_flow_id": request.identity.media_local_flow_id, "transport": transport,
                 "flow_name": request.name, "frames_per_packet": request.frames_per_packet.map_or(0, |value| value.get()),
-                "destinations": destinations, "request_options_word": request_options_word.cloned().unwrap_or(json!(0))})
+                "destinations": destinations, "request_options_word": request_options_word.cloned().unwrap_or(json!(0))});
+            // 2.8.9 commands keep their existing shape; the serializer defaults to 0x2809.
+            if input.protocol_id == Some(crate::protocol::PROTOCOL_ARC_280C) {
+                command["protocol_id"] = json!(crate::protocol::PROTOCOL_ARC_280C);
+            }
+            command
         }
         (_, Some(crate::commands::PROTOCOL_DANTE_FLOW_2801)) => {
             plan.reject("this revision has no digest-bound create request/acknowledgement fixture");
@@ -425,6 +441,21 @@ pub fn delete_authoring_family(capability_word: u64) -> &'static str {
     }
 }
 
+/// Transmit-flow authoring family for a device. ARC 2.8.12 (0x280C) WING
+/// Dante cards report capability word 0x0ff9 (bit 0x1000 clear) yet are
+/// authored and deleted with the segmented form, as captured from Dante
+/// Controller, so 0x280C always selects the segmented family.
+pub fn transmit_flow_authoring_family(
+    capability_word: u64,
+    protocol_id: Option<u16>,
+) -> &'static str {
+    if protocol_id == Some(crate::protocol::PROTOCOL_ARC_280C) {
+        "segmented"
+    } else {
+        delete_authoring_family(capability_word)
+    }
+}
+
 pub fn plan_delete(request: &FlowDeleteRequest) -> FlowCommandPlan {
     let mut plan = FlowCommandPlan {
         reasons: request.device.reasons(true),
@@ -435,9 +466,13 @@ pub fn plan_delete(request: &FlowDeleteRequest) -> FlowCommandPlan {
         .capability_word
         .as_ref()
         .and_then(Value::as_u64)
-        .map(delete_authoring_family);
+        .map(|word| transmit_flow_authoring_family(word, request.protocol_id));
     match request.protocol_id {
-        Some(crate::commands::PROTOCOL_DANTE_FLOW | crate::protocol::PROTOCOL_ARC_2809) => {}
+        Some(
+            crate::commands::PROTOCOL_DANTE_FLOW
+            | crate::protocol::PROTOCOL_ARC_2809
+            | crate::protocol::PROTOCOL_ARC_280C,
+        ) => {}
         Some(crate::commands::PROTOCOL_DANTE_FLOW_2801) => {
             plan.reject("this revision has no digest-bound delete request/acknowledgement fixture");
         }

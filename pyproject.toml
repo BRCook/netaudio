@@ -3,7 +3,7 @@ name = "netaudio"
 version = "0.5.2"
 description = "Cross-platform control, automation, and monitoring for Dante network audio devices"
 readme = "README.md"
-license = "Unlicense"
+license = "AGPL-3.0-or-later"
 requires-python = ">=3.10"
 authors = [{ name = "Christopher Ritsen", email = "chris.ritsen@gmail.com" }]
 keywords = ["audinate", "audio", "cli", "dante", "network"]
@@ -50,6 +50,7 @@ path = "hatch_build_core.py"
 [tool.hatch.build.targets.sdist]
 include = [
     "/LICENSE",
+    "/LICENSE-UPSTREAM",
     "/README.md",
     "/hatch_build_core.py",
     "/pyproject.toml",

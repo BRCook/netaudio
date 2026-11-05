@@ -143,9 +143,22 @@ impl DeviceRecord {
         fields.insert("tx_count_raw".to_owned(), json!(counts.tx_count));
         fields.insert("rx_count_raw".to_owned(), json!(counts.rx_count));
         fields.insert("is_locked".to_owned(), json!(counts.locked));
-        let capabilities = netaudio_core::parser::flow_authoring_capabilities(
+        let mut capabilities = netaudio_core::parser::flow_authoring_capabilities(
             counts.transmit_flow_authoring_capability_word,
         );
+        // The transmit authoring form follows the advertised ARC protocol as well
+        // as the capability word (0x280C devices report 0x0ff9 yet use the
+        // segmented, media-local form); receive-flow queries keep the word's family.
+        let protocol = self
+            .routing_protocol()
+            .ok()
+            .flatten()
+            .map(|protocol| protocol.protocol_id);
+        capabilities.transmit_flow_authoring =
+            netaudio_core::parser::transmit_flow_authoring_profile(
+                counts.transmit_flow_authoring_capability_word,
+                protocol,
+            );
         let Value::Object(capabilities) = serde_json::to_value(capabilities)? else {
             bail!("flow capabilities must serialize as an object");
         };

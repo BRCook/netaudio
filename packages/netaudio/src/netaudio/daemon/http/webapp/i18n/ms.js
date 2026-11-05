@@ -112,6 +112,7 @@ export default {
   "set sample rate pull-up on device": "tetapkan tarik naik kadar sampel pada peranti",
   "Follower only": "Pengikut sahaja",
   "PTPv2 domain": "Domain PTPv2",
+  "PTPv2 multicast": "Multicast PTPv2",
   "PTPv2 priority 1": "Keutamaan 1 PTPv2",
   "PTPv2 priority 2": "Keutamaan 2 PTPv2",
   "Multicast DSCP": "DSCP Multicast",

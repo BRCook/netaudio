@@ -4,7 +4,7 @@ import { api } from "../api.js";
 import { AsyncButton, FieldRow, Panel } from "../components.js";
 import * as format from "../format.js";
 import { t } from "../i18n.js";
-import { html, useRef, useState } from "../lib/preact.js";
+import { html, useEffect, useRef, useState } from "../lib/preact.js";
 import { deviceRequestName } from "../store.js";
 import {
   operationWritable,
@@ -244,16 +244,38 @@ function OnOffSelect({ reference, onChange, label }) {
   </select>`;
 }
 
+// Well inside the 10-second freshness window, so a single lost reply does not
+// hide the controls.
+const CLOCK_REFRESH_INTERVAL_MS = 3000;
+
 function ClockingControls({ device, requestName }) {
   const preferred = useRef(null);
   const source = useRef(null);
   const subdomain = useRef(null);
   const unicast = useRef(null);
+  const ptpv2 = useRef(null);
   const [extended, setExtended] = useState({});
   const [portChanges, setPortChanges] = useState({});
   const allowed = device.clock_control_availability || {};
   const fresh = format.clockStatusFresh(device);
   const managed = isEnrolled(device);
+  const clockReadable = device.online !== false && device.clock_status?.status_supported === true;
+  // Some devices (the Behringer WING) publish clock status only when asked, so
+  // keep it fresh while these controls are on screen instead of hiding them.
+  useEffect(() => {
+    if (managed || !clockReadable || !requestName) return undefined;
+    let inFlight = false;
+    const refresh = () => {
+      if (inFlight) return;
+      inFlight = true;
+      api.refreshClock(requestName).catch(() => {}).finally(() => {
+        inFlight = false;
+      });
+    };
+    if (!format.clockStatusFresh(device)) refresh();
+    const timer = setInterval(refresh, CLOCK_REFRESH_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [requestName, managed, clockReadable]);
   if (managed) {
     return html`<${Panel} title=${t("Clocking")}>
       <${FieldRow} label=${t("Preferred leader")}>
@@ -279,13 +301,14 @@ function ClockingControls({ device, requestName }) {
   const named = allowed.subdomain === true;
   const perPort = allowed.aggregate_ptpv1_unicast_delay_requests === true;
   const unicastAllowed = perPort || allowed.global_unicast_delay_requests === true;
+  const ptpv2Allowed = allowed.ptpv2_enabled === true && device.clock_status?.ptpv2_enabled != null;
   const extendedFields = EXTENDED_CLOCK_FIELDS.filter(
     ([name]) => allowed[name] === true && device.clock_status?.[name] != null,
   );
   const ports = allowed.ports === true
     ? (device.clock_status?.extended_ports || []).filter((port) => port.port_id >= 1 && port.port_id <= 64)
     : [];
-  if (!preferredAllowed && !sourceAllowed && !named && !unicastAllowed && !extendedFields.length && !ports.length) {
+  if (!preferredAllowed && !sourceAllowed && !named && !unicastAllowed && !ptpv2Allowed && !extendedFields.length && !ports.length) {
     return null;
   }
   const apply = async () => {
@@ -310,6 +333,8 @@ function ClockingControls({ device, requestName }) {
           ? "aggregate_ptpv1_unicast_delay_requests"
           : "global_unicast_delay_requests"
       ] = unicast.current.value === "true";
+    if (ptpv2Allowed && ptpv2.current?.value !== "keep")
+      changes.ptpv2_enabled = ptpv2.current.value === "true";
     return api.setClockConfiguration(requestName, changes);
   };
   return html`
@@ -326,6 +351,10 @@ function ClockingControls({ device, requestName }) {
       <//>` : null}
       ${unicastAllowed ? html`<${FieldRow} label=${perPort ? t("PTPv1 unicast delay requests") : t("Unicast delay requests")}>
         <${OnOffSelect} reference=${unicast} label=${perPort ? t("PTPv1 unicast delay requests") : t("Unicast delay requests")} />
+      <//>` : null}
+      ${ptpv2Allowed ? html`<${FieldRow} label=${t("PTPv2 multicast")}>
+        <${OnOffSelect} reference=${ptpv2} label=${t("PTPv2 multicast")} />
+        <span>${t("Current")}: ${device.clock_status.ptpv2_enabled ? t("On") : t("Off")}</span>
       <//>` : null}
       ${extendedFields.length || ports.length ? html`<details><summary>${t("Advanced clock settings")}</summary>
         ${extendedFields.map(([name, label, maximum]) => html`<${FieldRow} label=${label}>

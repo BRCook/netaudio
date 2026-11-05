@@ -112,6 +112,7 @@ export default {
   "set sample rate pull-up on device": "definir o pull-up da taxa de amostragem do dispositivo",
   "Follower only": "Somente seguidor",
   "PTPv2 domain": "Domínio PTPv2",
+  "PTPv2 multicast": "PTPv2 multicast",
   "PTPv2 priority 1": "Prioridade 1 PTPv2",
   "PTPv2 priority 2": "Prioridade 2 PTPv2",
   "Multicast DSCP": "DSCP multicast",

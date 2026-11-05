@@ -95,6 +95,177 @@ mod fixed_authoring_tests {
     }
 
     #[test]
+    fn behringer_wing_280c_native_create_plans_the_segmented_serializer() {
+        // Facts observed from a Behringer WING Dante card: ARC 2.8.12, capability
+        // word 0x0ff9 (bit 0x1000 clear), 64 transmit channels, 32 slots per flow.
+        let input = json!({"protocol_id":0x280C,
+            "specification":{"media_mode":"native_dante","flow_type":"multicast",
+                "channel_slots":[{"slot":1,"transmitter_channel":1},{"slot":2,"transmitter_channel":2}],
+                "identity":{"media_local_flow_id":1},"name":"test-flow"},
+            "device":{"managed":false,"locked":false,"capability_word":0x0ff9,
+                "advertised_protocol":0x280C,"sample_rate":48000,"encoding":24,
+                "channels":(1..=64).collect::<Vec<u16>>(),"channel_capacity":32,
+                "capabilities":{}}});
+        let plan = crate::flow_plan::plan_create(&serde_json::from_value(input).unwrap());
+        assert!(plan.reasons.is_empty(), "{:?}", plan.reasons);
+        assert_eq!(plan.authoring_family, Some("segmented"));
+        let command = plan.command.unwrap();
+        assert_eq!(command["command"], "create_multicast_flow_2809");
+        assert_eq!(command["protocol_id"], 0x280C);
+        let packet =
+            crate::spec::build_command_from_json(&serde_json::Value::Object(command).to_string())
+                .unwrap();
+        assert_eq!(&packet[0..2], &0x280Cu16.to_be_bytes());
+        assert_eq!(
+            &packet[6..8],
+            &crate::commands::OPCODE_CREATE_TX_FLOW_2809.to_be_bytes()
+        );
+    }
+
+    #[test]
+    fn behringer_wing_280c_transmitter_flow_page_parses_and_converts() {
+        // Dante Controller 0x2600 readback from a Behringer WING (ARC 2.8.12)
+        // holding two 32-channel multicast flows numbered 31 and 32 while
+        // reporting 16 flow slots.
+        let response = crate::test_support::decode_hexadecimal(concat!(
+            "280c017c0015260000010000000000001002004000e000000000000000000000000000000000",
+            "0000000000000000000000003331000000000000bb80000000181649001f00000003001f0000",
+            "000000020000000000320038000f4240000000000000000000000000000000000a3300000000",
+            "00000001000000000000000000000429010000d4000023250020002100220023002400250026",
+            "002700280029002a002b002c002d002e002f0030003100320033003400350036003700380039",
+            "003a003b003c003d003e003f004000000200000800000802000000000000333200001649002000",
+            "00000300200000000000020000000000dc0038000f4240000000000000000000000000000000",
+            "000a33000000000000000100000000000000000000042901010174000023250020000100020003",
+            "000400050006000700080009000a000b000c000d000e000f0010001100120013001400150016",
+            "001700180019001a001b001c001d001e001f00200000020000080000080210e1efff5b75"
+        ));
+        let mut inventory = crate::flow_inventory::FlowInventory::new(
+            crate::flow_inventory::FlowDirection::Transmitter,
+            crate::protocol::PROTOCOL_ARC_280C,
+            8,
+        )
+        .unwrap();
+        inventory.accept(&response).unwrap();
+        let state = serde_json::to_value(inventory.state()).unwrap();
+        let records = state["inventory"]["flows"].as_array().unwrap().clone();
+        assert_eq!(records.len(), 2);
+        assert!(crate::flow_readback::inventory_complete(
+            state["inventory"].clone()
+        ));
+        let ids: Vec<_> = records
+            .iter()
+            .map(|r| r["global_flow_id"].clone())
+            .collect();
+        assert_eq!(ids, vec![json!(31), json!(32)]);
+        for record in records {
+            let request =
+                serde_json::from_value(json!({"protocol_id":0x280C,"record":record})).unwrap();
+            let specification =
+                crate::flow_readback::transmit_flow_specification(&request).unwrap();
+            let specification = serde_json::to_value(specification).unwrap();
+            assert_eq!(specification["media_mode"], "native_dante");
+            assert!(specification["observed_fields"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("media_mode")));
+        }
+    }
+
+    #[test]
+    fn behringer_wing_280c_delete_matches_dante_controller_capture() {
+        // Dante Controller deleting media-local flow 31 on a Behringer WING (ARC 2.8.12).
+        let captured = crate::test_support::decode_hexadecimal(
+            "280c0022001926020000000000000000000100030000001f00000000000000000000",
+        );
+        let selection = crate::commands::TxFlowDeleteSelection::Segmented {
+            media_local_flow_id: 0x1f,
+            media_type: crate::commands::SEGMENTED_DELETE_MEDIA_TYPE_AUDIO,
+        };
+        assert_eq!(
+            crate::commands::build_delete_tx_flow(
+                crate::protocol::PROTOCOL_ARC_280C,
+                selection,
+                0x19
+            )
+            .unwrap(),
+            captured
+        );
+
+        // The WING's capability word (0x0ff9) lacks bit 0x1000, but deletion on
+        // 0x280C must still select the segmented form from fresh inventory.
+        let response = crate::test_support::decode_hexadecimal(concat!(
+            "280c017c0015260000010000000000001002004000e000000000000000000000000000000000",
+            "0000000000000000000000003331000000000000bb80000000181649001f00000003001f0000",
+            "000000020000000000320038000f4240000000000000000000000000000000000a3300000000",
+            "00000001000000000000000000000429010000d4000023250020002100220023002400250026",
+            "002700280029002a002b002c002d002e002f0030003100320033003400350036003700380039",
+            "003a003b003c003d003e003f004000000200000800000802000000000000333200001649002000",
+            "00000300200000000000020000000000dc0038000f4240000000000000000000000000000000",
+            "000a33000000000000000100000000000000000000042901010174000023250020000100020003",
+            "000400050006000700080009000a000b000c000d000e000f0010001100120013001400150016",
+            "001700180019001a001b001c001d001e001f00200000020000080000080210e1efff5b75"
+        ));
+        let mut inventory = crate::flow_inventory::FlowInventory::new(
+            crate::flow_inventory::FlowDirection::Transmitter,
+            crate::protocol::PROTOCOL_ARC_280C,
+            8,
+        )
+        .unwrap();
+        inventory.accept(&response).unwrap();
+        let state = serde_json::to_value(inventory.state()).unwrap();
+        let preflight = crate::flow_readback::delete_preflight(
+            serde_json::from_value(json!({"capability_word":0x0ff9,"flow_id":31,
+                "inventory":state["inventory"],"protocol_id":0x280C}))
+            .unwrap(),
+        );
+        let preflight = serde_json::to_value(preflight).unwrap();
+        assert_eq!(preflight["state"], "ready", "{preflight}");
+        let mut command = preflight["command"].clone();
+        assert_eq!(command["selection"]["family"], "segmented");
+        command["message_id"] = json!(0x19);
+        assert_eq!(
+            crate::spec::build_command_from_json(&command.to_string()).unwrap(),
+            captured
+        );
+
+        let plan = crate::flow_plan::plan_delete(
+            &serde_json::from_value(json!({"protocol_id":0x280C,"flow_id":31,
+                "device":{"managed":false,"locked":false,"capability_word":0x0ff9,
+                    "advertised_protocol":0x280C,"sample_rate":48000,"encoding":24,
+                    "channels":[1],"channel_capacity":32,"capabilities":{}}}))
+            .unwrap(),
+        );
+        assert!(plan.reasons.is_empty(), "{:?}", plan.reasons);
+        assert_eq!(plan.authoring_family, Some("segmented"));
+    }
+
+    #[test]
+    fn behringer_wing_280c_offers_the_media_local_identity_field() {
+        let wing = crate::parser::transmit_flow_authoring_profile(0x0ff9, Some(0x280C));
+        assert_eq!(
+            (wing.family, wing.identity_field),
+            ("segmented", "media_local_flow_id")
+        );
+        let fixed = crate::parser::transmit_flow_authoring_profile(0x0ff9, Some(0x2809));
+        assert_eq!(
+            (fixed.family, fixed.identity_field),
+            ("fixed", "global_flow_id")
+        );
+        let segmented = crate::parser::transmit_flow_authoring_profile(0x1030, None);
+        assert_eq!(segmented.family, "segmented");
+    }
+
+    #[test]
+    fn behringer_wing_280c_prefers_advertised_flow_inventory_protocol() {
+        let protocol = crate::protocol::flow_inventory_protocol(
+            serde_json::from_value(json!({"observed":0x2801,"version":"2.8.12","managed":false}))
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(protocol, Some(crate::protocol::PROTOCOL_ARC_280C));
+    }
+
+    #[test]
     fn fixed_readback_preserves_flags_class_sockets_and_packet_count() {
         let mut packet = crate::spec::build_command_from_json(&request().to_string()).unwrap();
         packet[6..8].copy_from_slice(&0x2200u16.to_be_bytes());
@@ -699,7 +870,10 @@ pub fn build_delete_tx_flow(
     selection: TxFlowDeleteSelection,
     message_id: u16,
 ) -> Result<Vec<u8>, NetaudioError> {
-    if !matches!(flow_protocol_id, PROTOCOL_DANTE_FLOW | PROTOCOL_ARC_2809) {
+    if !matches!(
+        flow_protocol_id,
+        PROTOCOL_DANTE_FLOW | PROTOCOL_ARC_2809 | PROTOCOL_ARC_280C
+    ) {
         return Err(NetaudioError::InvalidFlowProtocol);
     }
     match selection {

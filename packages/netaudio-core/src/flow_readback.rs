@@ -222,11 +222,16 @@ fn record_media_identity(record: &serde_json::Map<String, Value>) -> Option<(u64
 
 fn delete_selection(
     capability_word: u16,
+    protocol_id: u16,
     flow_id: u16,
     record: &serde_json::Map<String, Value>,
     flows: &[serde_json::Map<String, Value>],
 ) -> Result<crate::commands::TxFlowDeleteSelection, (FlowPreflightOutcome, String)> {
-    if crate::flow_plan::delete_authoring_family(u64::from(capability_word)) == "fixed" {
+    if crate::flow_plan::transmit_flow_authoring_family(
+        u64::from(capability_word),
+        Some(protocol_id),
+    ) == "fixed"
+    {
         return Ok(crate::commands::TxFlowDeleteSelection::Fixed {
             global_flow_id: flow_id,
         });
@@ -308,6 +313,7 @@ pub fn delete_preflight(request: FlowDeletePreflightRequest) -> FlowDeletePrefli
 
     let selection = match delete_selection(
         capability_word,
+        request.protocol_id,
         request.flow_id.get(),
         &record,
         &inventory.flows,
@@ -733,12 +739,13 @@ struct InventoryRecord {
 
 pub(crate) fn readback_protocol(protocol_id: u16) -> Result<(&'static str, bool), String> {
     use crate::commands::{PROTOCOL_DANTE_FLOW, PROTOCOL_DANTE_FLOW_2801};
-    use crate::protocol::{PROTOCOL_ARC_2809, PROTOCOL_ARC_280F};
+    use crate::protocol::{PROTOCOL_ARC_2809, PROTOCOL_ARC_280C, PROTOCOL_ARC_280F};
 
     Ok(match protocol_id {
         PROTOCOL_DANTE_FLOW => ("legacy_2729", false),
         PROTOCOL_DANTE_FLOW_2801 => ("legacy_2801", false),
         PROTOCOL_ARC_2809 => ("modern_2809", true),
+        PROTOCOL_ARC_280C => ("modern_280c", true),
         PROTOCOL_ARC_280F => ("modern_280f", true),
         _ => return Err("unsupported transmitter flow readback protocol".into()),
     })

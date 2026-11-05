@@ -118,6 +118,9 @@ pub struct PtpClockStatus {
     pub preferred_leader_locked: Option<bool>,
     pub global_unicast_delay_requests: Option<bool>,
     pub aggregate_ptpv1_unicast_delay_requests: Option<bool>,
+    /// Whether the multicast PTPv2 port records are switched on (their
+    /// user-disable bit is clear). `None` when absent, unreported or mixed.
+    pub ptpv2_enabled: Option<bool>,
     pub clock_subdomain: Option<[u8; 16]>,
     pub mute_flags: Option<u16>,
     pub mute_state: Option<&'static str>,
@@ -268,6 +271,7 @@ pub fn parse_ptp_clock_status(data: &[u8]) -> Option<PtpClockStatus> {
         preferred_leader_locked: None,
         global_unicast_delay_requests: None,
         aggregate_ptpv1_unicast_delay_requests: None,
+        ptpv2_enabled: None,
         clock_subdomain: None,
         mute_flags: None,
         mute_state: None,
@@ -487,6 +491,16 @@ pub fn parse_ptp_clock_status(data: &[u8]) -> Option<PtpClockStatus> {
         let first = ptpv1[0].unicast_delay_requests;
         if ptpv1.iter().all(|p| p.unicast_delay_requests == first) {
             s.aggregate_ptpv1_unicast_delay_requests = first;
+        }
+    }
+    let ptpv2_multicast: Vec<_> = ports
+        .iter()
+        .filter(|p| p.ptp_version == 2 && p.transport_path_code == 1)
+        .collect();
+    if !ptpv2_multicast.is_empty() && ptpv2_multicast.iter().all(|p| p.user_disabled.is_some()) {
+        let first = ptpv2_multicast[0].user_disabled;
+        if ptpv2_multicast.iter().all(|p| p.user_disabled == first) {
+            s.ptpv2_enabled = first.map(|disabled| !disabled);
         }
     }
     s.clock_port_records = base_vector.then_some(ports);

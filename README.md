@@ -1,246 +1,28 @@
 # NetAudio — unofficial Dante Controller alternative
 
-NetAudio is an unofficial Dante Controller alternative for discovering,
-routing, configuring, and monitoring Dante network audio devices. The project
-provides open-source command-line tools, a web interface, a persistent daemon,
-and a protocol library for Linux, macOS, and Windows.
+> [!NOTE]
+> This is a fork of Chris Ritsen's [network-audio-controller](https://github.com/chris-ritsen/network-audio-controller), maintained for use with [Virgil](https://github.com/BRCook/dante-virgil) and [Headhunter](https://github.com/BRCook/wing-headhunter). It adds multicast flow support for Dante devices using ARC protocol 2.8.12 and a PTPv2 clock setting. Please report problems with these additions here rather than to Chris.
 
-NetAudio is a native Dante Controller alternative for iOS and iPadOS,
-available now for iPhone and iPad through
-[TestFlight](https://testflight.apple.com/join/GcuDerST). The app communicates
-directly with Dante devices for live discovery, audio subscription routing,
-device and channel configuration, live device metering, clock and status
-monitoring, and diagnostics. Local direct-device control runs on the
-phone or tablet without a separate computer, remote desktop session, or NetAudio
-daemon. The app also supports Dante Domain Manager (DDM) networks and connections
-to a NetAudio daemon.
+NetAudio discovers, routes, configures and monitors Dante network audio devices without Dante Controller. It provides a command-line interface, a web interface served by a background daemon, an HTTP API with live events, and a Rust protocol library.
 
-[Website and iOS app](https://netaudio.app/) ·
-[Install the CLI and web interface](#installation) ·
-[Quick start](#quick-start)
+## What this fork adds
 
-## Interfaces and architecture
-
-NetAudio serves both interactive device control and software automation. A
-shared Rust protocol core implements Dante packet encoding and parsing for the
-Python application and native iOS client.
-
-| Interface | Use |
+| Change | Where |
 | --- | --- |
-| Native iOS/iPadOS app | Discover, route, configure, and monitor devices from an iPhone or iPad using direct control or a NetAudio daemon. Available as a TestFlight beta. |
-| Command-line interface (CLI) | Inspect devices, manage subscriptions and settings, apply presets, and integrate with scripts using structured JSON output. Supports direct device access and daemon integration. |
-| Web interface | Control and monitor the network in a browser, served by the NetAudio daemon. |
-| Background daemon | Maintain network discovery, device inventory, monitoring, event history, and control services across client sessions. |
-| HTTP API and live events | Integrate network state and device control into other applications, with server-sent events (SSE) for live updates. |
-| Protocol library | Use the Rust core directly or through its [C interface](https://github.com/chris-ritsen/network-audio-controller/blob/master/packages/netaudio-core/include/netaudio_core.h). |
+| Create, read back and delete native multicast transmit flows on devices using ARC protocol 2.8.12 (0x280C) | CLI and web UI |
+| Switch a device's PTPv2 multicast clock port on or off without enabling AES67 mode | CLI (`device config ptpv2`) and web UI (Clocking panel) |
+| Ask newly found devices for their encoding when it is not otherwise known, so flow plans no longer report an unknown audio format | Daemon |
+| Keep clock status fresh while the Clocking panel is open, for devices that only report it when asked | Web UI |
+| Remove the iOS and iPadOS app packaging | Repository |
 
-The CLI and daemon run on Linux, macOS, and Windows. Automated checks cover all
-three platforms, including native libraries and installed Python packages.
-
-## Capabilities
-
-- **Discovery and routing:** discover Dante devices and their receive/transmit
-  channels, inspect subscription status, and add or remove audio subscriptions.
-- **Device configuration:** device and channel names, sample rate, encoding,
-  latency, analog gain, device locking, preferred clock leader, AES67 settings,
-  and primary/secondary network configuration on supported devices.
-- **Audio flows:** inspect receive and transmit flows, plan and manage supported
-  native Dante multicast transmit flows, discover advertised AES67 audio
-  streams, and subscribe compatible receivers to them.
-- **Native audio reception:** record an existing native-v2 multicast PCM flow
-  with `netaudio audio receive`. Supply its established sender, multicast
-  destination, local interface address and format. Recordings preserve raw
-  datagrams and sample timestamps alongside PCM WAVE files; discontinuities
-  start separate files. This receives audio without changing device routes or
-  playing it through local speakers. See `netaudio audio receive --help`.
-  `netaudio audio inspect` reads the current packetization, latency and named
-  clock-domain properties from an explicit device ARC endpoint.
-  `netaudio audio receive-unicast` allocates one source flow using an explicit
-  admitted session context, records it, and attempts one owned STOP. It preserves
-  allocation outcomes and uncertain cleanup without retrying mutations. See
-  `netaudio audio receive-unicast --help` for the required session fields.
-  On Linux, `netaudio audio serve --configuration endpoint.json` runs the
-  bidirectional virtual endpoint with configurable channel counts and
-  48 kHz/24-bit network PCM. Native JACK ports or explicit WAVE adapters
-  provide local input/output. `netaudio audio clock-serve --socket PATH`
-  shares one PTP transport among independent endpoint processes on the host.
-  See [endpoint configuration and operating limits](docs/audio-endpoint.md).
-  Broader Dante Controller and hardware interoperability remain unqualified.
-- **Desktop video adapters (Linux X11):** `netaudio video share --desktop`
-  captures a desktop or, with `--window`, one application window. A receiving
-  `netaudio video listen` can display it fullscreen or feed an existing
-  V4L2 loopback camera for OBS. Both commands use explicit peer addresses;
-  see their `--help` for the connection options. These direct sessions are
-  video-only. Dante Controller and NetAudio routing-inventory integration is
-  still pending. The video build also requires SDL2; camera output requires
-  an installed V4L2 loopback device. Press F to toggle fullscreen and Escape
-  to close the viewer and session.
-- **Configured H.264 reception:** `netaudio video receive --configuration
-  session.json --output recording --duration 10` records a current, explicitly
-  configured Studio-compatible stream as NV12 frames with source identities and
-  local arrival/deadline metadata. Supply exact endpoints, RTP identity,
-  compatible SPS/PPS, image format, authority expiry and finite limits. Supports
-  progressive eight-bit 4:2:0 I/P pictures; automatic stream acquisition and
-  synchronized display are not implemented. On Linux, build with `NETAUDIO_VIDEO=1` and
-  GStreamer development libraries; runtime plugins must provide `h264parse`,
-  `avdec_h264` and `videoconvert`. `netaudio video session-schema` prints the
-  required JSON structure; see `netaudio video receive --help` for usage.
-- **Configured H.264 transmission:** `netaudio video transmit --configuration
-  source.json --input frames.bgra --output transmission --duration 10` encodes
-  finite, tightly packed 1920×1080 BGRA frames at 30 fps and sends RTP to one
-  explicitly configured unicast receiver. `netaudio video transmit-schema`
-  describes the source configuration. Use `--prepare-only` first to obtain
-  actual SPS/PPS in `parameters.json` without sending media. The video build
-  also needs `openh264enc` and `rtph264pay`. Stream allocation, discovery and
-  remote decoding/display verification remain separate.
-- **Device metering and monitoring:** live signal levels, clock status, interface
-  statistics and errors, device diagnostics, monitoring issues, and event
-  history through the CLI, API, and browser.
-- **Dante Domain Manager:** discover managed inventory and control supported
-  settings on DDM-enrolled devices using configured credentials and operation
-  permissions.
-- **Presets and automation:** save and apply device/routing presets, map device
-  identities, inspect application results, and consume structured output from
-  scripts and other control systems.
-
-Device capabilities and the selected control transport determine which
-operations are available.
+The flow changes apply only to devices advertising protocol 0x280C, and the PTPv2 setting is only offered where the device's clock status reports support for it. Other devices behave as they do upstream.
 
 ## Installation
 
-### iOS and iPadOS (iPhone and iPad)
+This fork is installed as part of Virgil and Headhunter and is not published to PyPI.
 
-Install the native NetAudio iOS/iPadOS app through
-[TestFlight](https://testflight.apple.com/join/GcuDerST). See
-[netaudio.app](https://netaudio.app/) for app information and support.
-
-### Linux, macOS, and Windows
-
-Install the CLI, daemon, and web interface from PyPI:
-
-```bash
-uv tool install netaudio
-```
-
-Or with pip:
-
-```bash
-pip install netaudio
-```
-
-### Arch Linux
-
-Install the [netaudio AUR package](https://aur.archlinux.org/packages/netaudio).
-
-### Containers
-
-The daemon, web interface and MCP server also run as a container image,
-`s00pcan/netaudio`, for Linux hosts on the Dante network. Dante discovery,
-heartbeats and metering need the host's network, so the container shares it
-instead of getting its own. Docker Desktop on macOS and Windows runs
-containers inside a virtual machine that cannot see Dante traffic.
-
-With Docker:
-
-```bash
-docker run -d --name netaudio --network host --init --restart unless-stopped \
-  -v netaudio:/var/lib/netaudio s00pcan/netaudio
-docker exec netaudio netaudio device list
-```
-
-From a checkout of this repository,
-`docker compose -f containers/compose.yaml up -d` does the same. Settings, the
-TLS identity, presets and MCP sign-ins are kept in the `netaudio` volume. Pass
-the options below with `-e`, or set them in `containers/.env` for Compose. The
-`latest` tag is the newest release, and `edge` is built from every change to
-`master`. To update, run `docker pull s00pcan/netaudio`, then remove and run
-the container again; with Compose, `pull` and then `up -d`.
-
-To build the image yourself, use
-`docker compose -f containers/compose.yaml -f containers/compose.build.yaml up -d --build`.
-One machine builds both architectures without emulation:
-`docker buildx build --platform linux/amd64,linux/arm64 --file containers/Dockerfile .`
-
-With systemd-nspawn (systemd 260 or newer), the same image runs without
-Docker. Save these settings as `/etc/systemd/nspawn/netaudio.nspawn`; they are
-also in `containers/netaudio.nspawn`:
-
-```ini
-[Exec]
-Boot=no
-KillSignal=TERM
-Parameters=/usr/local/bin/netaudio daemon run
-User=netaudio
-WorkingDirectory=/var/lib/netaudio
-Environment=HOME=/var/lib/netaudio
-Environment=NETAUDIO_CONFIG=/var/lib/netaudio/config.toml
-Environment=PYTHONUNBUFFERED=1
-Environment=NOTIFY_SOCKET=
-PrivateUsers=no
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
-
-[Files]
-Bind=/var/lib/netaudio
-
-[Network]
-Private=no
-VirtualEthernet=no
-```
-
-Then name the container after this host, so the certificate, Bonjour name and
-MCP address use the host's name, pull the image, and start it now and at boot:
-
-```bash
-sudo sed -i "/^\[Exec\]/a Hostname=$(hostnamectl hostname)" /etc/systemd/nspawn/netaudio.nspawn
-sudo importctl pull-oci --class=machine docker.io/s00pcan/netaudio:latest netaudio
-sudo install -d -o 10001 -g 10001 -m 0750 /var/lib/netaudio
-sudo machinectl enable --now netaudio
-journalctl -u systemd-nspawn@netaudio -f
-```
-
-To update, stop the container, pull again with `--force`, and start it:
-
-```bash
-sudo machinectl stop netaudio
-sudo importctl pull-oci --force --class=machine docker.io/s00pcan/netaudio:latest netaudio
-sudo machinectl start netaudio
-```
-
-Settings and state live in `/var/lib/netaudio` on the host, including
-`config.toml`; add `Environment=` lines for the options below. To run CLI
-commands inside the container, save this as `/usr/local/bin/netaudio` and use
-`sudo netaudio device list`:
-
-```sh
-#!/bin/sh
-exec nsenter --target "$(machinectl show netaudio --property=Leader --value)" --all \
-  --setuid 10001 --setgid 10001 \
-  env HOME=/var/lib/netaudio NETAUDIO_CONFIG=/var/lib/netaudio/config.toml netaudio "$@"
-```
-
-Container options, as environment variables:
-
-| Variable | Purpose |
-| --- | --- |
-| `NETAUDIO_INTERFACE` | Network interface for Dante traffic on hosts with more than one |
-| `NETAUDIO_DAEMON_PORT` | Plain HTTP port, loopback only while HTTPS is on (default 4780) |
-| `NETAUDIO_TLS_PORT` | HTTPS port for the web interface, apps and MCP (default 4781) |
-| `NETAUDIO_TLS_CERTIFICATE`, `NETAUDIO_TLS_KEY` | Your own certificate and key, mounted into the container and readable by user 10001 |
-| `NETAUDIO_TLS_NAMED_CERTIFICATE`, `NETAUDIO_TLS_NAMED_KEY` | A certificate and key served only to clients that ask for a name it covers |
-| `NETAUDIO_NO_SSL` | `true` serves plain HTTP on the network instead of HTTPS |
-| `REDIS_HOST`, `REDIS_PORT`, `REDIS_SOCKET`, `REDIS_DB`, `REDIS_PASSWORD` | Publish device state to this Redis server |
-
-The host firewall must allow the HTTPS port from clients, and UDP from the
-Dante network for discovery, heartbeats and metering.
-
-### From source
-
-A source checkout requires Python 3.10 or newer, `uv`, and a Rust toolchain:
-
-```bash
-uv sync
-uv run netaudio --help
-```
+> [!WARNING]
+> `uv tool install netaudio`, `pip install netaudio`, the AUR package and the `s00pcan/netaudio` container all install the **original** netaudio, not this one!
 
 ## Quick start
 
@@ -251,64 +33,85 @@ netaudio daemon start
 netaudio daemon web --open
 ```
 
-Use `netaudio --help` for the command list and `netaudio COMMAND --help` for
-individual commands. From a source checkout, use `uv run netaudio`.
+Use `netaudio --help` for the command list and `netaudio COMMAND --help` for individual commands.
 
-For example, inspect a device by name and request JSON output:
+Select devices with filters placed before the command: `-n` matches names (including quoted patterns such as `'stage-*'`), `-s` matches server names, `-m` matches MAC addresses, and `--host` selects an IP address. Add `--json` for structured output:
 
 ```bash
-netaudio -n avio-usb-1 device show
-netaudio --json -n avio-usb-1 device show
+netaudio -n console device show
+netaudio --json -n console device show
 ```
 
-Use your device's name in place of `avio-usb-1`. Put device filters before the
-command: `-n` matches names (including quoted patterns such as `'avio-*'`),
-`-s` matches server names, `-m` matches MAC addresses, and `--host` selects an
-IP address.
-
-Commands that change a device send the change and return. Add `--verify`
-before the command to wait until a fresh readback confirms it.
+Commands that change a device send the change and return. Add `--verify` before the command to wait until a fresh readback confirms it.
 
 ### Channels and routing
 
-Channels use `tx:NUMBER` or `rx:NUMBER`; a channel name can replace the number.
-For example, rename input 1 and connect output 1 of `stagebox` to it:
+Channels use `tx:NUMBER` or `rx:NUMBER`; a channel name can replace the number. For example, rename input 1 of `stagebox` and connect output 1 of `console` to it:
 
 ```bash
-netaudio -n avio-usb-1 channel name rx:1 vocal-in
-netaudio subscription add --tx tx:1@stagebox --rx rx:1@avio-usb-1
+netaudio -n stagebox channel name rx:1 vocal-in
+netaudio subscription add --tx tx:1@console --rx rx:1@stagebox
+netaudio subscription remove --rx rx:1@stagebox
 ```
 
-Remove that subscription with:
+### Multicast flows
+
+Describe the flow in a JSON file. Devices using ARC 2.8.12 identify flows by a media-local identifier, which Dante Controller numbers downward from 32:
+
+```json
+{
+  "schema_version": 1,
+  "media_mode": "native_dante",
+  "flow_type": "multicast",
+  "identity": { "media_local_flow_id": 32 },
+  "channel_slots": [
+    { "slot": 1, "transmitter_channel": 1 },
+    { "slot": 2, "transmitter_channel": 2 }
+  ]
+}
+```
+
+Check the plan, which sends nothing to the device, then create, list and delete the flow:
 
 ```bash
-netaudio subscription remove --rx rx:1@avio-usb-1
+netaudio -n console flow plan flow.json
+netaudio -n console flow apply flow.json --yes
+netaudio -n console flow inspect
+netaudio -n console flow delete --slot 32 --yes
 ```
+
+The web interface offers the same in the device's transmit flows section, where the new-flow form asks for a media-local flow identifier on these devices.
+
+### PTPv2 without AES67
+
+```bash
+netaudio -n console device config ptpv2
+netaudio -n console device config ptpv2 on
+netaudio -n console device config ptpv2 off
+```
+
+Each change is confirmed by reading the clock status back. In the web interface, use **PTPv2 multicast** in the device's Clocking panel.
+
+> [!IMPORTANT]
+> Some devices do not keep this setting when their Dante interface restarts. Switch it on again after a reboot.
 
 ### Presets
 
 Save selected devices, then preview the saved settings before applying them:
 
 ```bash
-netaudio -n 'avio-*' preset save stage
+netaudio -n 'stage-*' preset save stage
 netaudio preset show stage
 netaudio preset load stage
 ```
 
-`preset show` reads current device state but makes no changes. Presets are XML
-files in `presets/` beside the configuration file; use `preset list` to see them,
-or supply an explicit `.xml` path. Saving over an existing file requires
-`--force`.
+`preset show` reads current device state but makes no changes. Presets are XML files in `presets/` beside the configuration file; use `preset list` to see them, or supply an explicit `.xml` path. Saving over an existing file requires `--force`.
 
-### Configuration and troubleshooting
+## Configuration
 
-The daemon serves HTTPS on port 4781 with a self-signed certificate that it
-creates and renews automatically. Plain HTTP on port 4780 stays available on
-loopback for the local CLI and browser. `netaudio daemon web` lists the
-addresses.
+`netaudio config path` shows which configuration file is used. Restart the daemon after changing it.
 
-To use your own certificate or other ports, add these settings to the
-configuration file shown by `netaudio config path` and restart the daemon:
+The daemon serves HTTPS on port 4781 with a self-signed certificate that it creates and renews automatically. Plain HTTP on port 4780 stays available on loopback for the local CLI and browser; `netaudio daemon web` lists the addresses. To use your own certificate or other ports:
 
 ```toml
 [daemon]
@@ -318,97 +121,29 @@ tls_port = 4781
 port = 4780
 ```
 
-To also serve a certificate from a public authority, such as a wildcard
-for your own domain, to browsers that ask for one of its names, add:
+To serve plain HTTP on the network instead, set `no_ssl = true` under `[daemon]`.
 
-```toml
-[daemon]
-tls_named_certificate = "/path/to/fullchain.pem"
-tls_named_key = "/path/to/private-key.pem"
-```
+For a Dante Domain Manager network, `netaudio ddm login --default` guides you through connecting to a server and choosing a domain.
 
-Clients that connect by any other name, by address or without a name
-keep getting the daemon's own certificate, so apps that already trust it
-are unaffected. The daemon picks up renewed files without a restart.
+### Firewall
 
-To serve plain HTTP on the network instead, set `no_ssl = true` under
-`[daemon]`.
+Allow these UDP ports from the Dante network: 4440, 4444, 4455, 5353, 8700–8708, 8751 and 8800. Also allow the HTTPS port (4781 by default) from any computer that opens the web interface.
 
-The daemon can publish device state to Redis for other programs. Install
-`netaudio[redis]` and name the server; without a `[redis]` section the daemon
-does not use Redis:
+## Troubleshooting
 
-```toml
-[redis]
-host = "localhost"
-port = 6379
-```
-
-The daemon follows this computer's JACK and PulseAudio audio only when
-`host_audio = true` is set under `[daemon]` and JACK or PulseAudio is
-installed.
-
-`netaudio config path` shows which configuration file is used. For a DDM
-network, `netaudio ddm login --default` guides you through connecting to a
-server and choosing a domain.
-
-Use `netaudio daemon status` to check the daemon and `netaudio daemon logs -f`
-to follow its logs. Logs default to warnings and errors. To run in the
-foreground with detailed logging, stop the background daemon first:
+Use `netaudio daemon status` to check the daemon and `netaudio daemon logs -f` to follow its logs. Logs default to warnings and errors. For detailed logging, stop the background daemon and run it in the foreground:
 
 ```bash
 netaudio daemon stop
 netaudio --log-level DEBUG daemon run
 ```
 
-The browser's Events page keeps recent events and issues in memory. Restarting
-the daemon clears them. Use `netaudio events export --file events.json` to save
-the current event history before restarting.
+While the daemon is running, it receives the status reports Dante devices send on UDP port 8702. CLI commands that wait for those reports, such as clock, sample-rate and encoding readbacks, can time out as a result. Use the web interface for those settings, or stop the daemon while using the CLI for them.
 
-## Development
+The browser's Events page keeps recent events and issues in memory, and restarting the daemon clears them. Save them first with `netaudio events export --file events.json`.
 
-The project develops an independent implementation and understanding of Dante
-control protocols. Protocol work is recorded in reviewed source, focused tests,
-and evidence records identifying observed behavior and remaining unknowns.
-Research tooling is separate from normal application use.
+## Background
 
-Run the shared local/CI checks for the current host, using installed dependencies:
+NetAudio is an independent interoperability project and is not affiliated with or endorsed by Audinate. It grew out of packet capture replay and modification experiments first written up in a [Gearspace discussion](https://gearspace.com/board/music-computers/1221989-dante-routing-without-dante-controller-possible.html). The original project is by Chris Ritsen. This fork's additions were developed and tested against a Behringer WING Compact with Dante firmware 4.2.9.4.
 
-```bash
-make check-local
-```
-
-This incrementally builds the Rust core, selects that library for Python tests,
-and checks the native ABI, generated interfaces, formatting, lint, types, Rust
-tests, Python tests, and web unit tests. The run has a five-minute total limit.
-Its printed report path contains results, per-check logs, source identity, and
-the tested library digest. Failed checks stop the run; timeouts are incomplete.
-
-Run only source-quality/native checks or select another check group:
-
-```bash
-make quality
-.venv/bin/python scripts/check_project.py --scope python --offline
-.venv/bin/python scripts/check_project.py --scope webapp --offline
-```
-
-The manually dispatched
-[CI workflow](https://github.com/chris-ritsen/network-audio-controller/blob/master/.github/workflows/quality.yml)
-uses the same check commands. Browser tests and installed-wheel/platform
-matrices are separate, explicitly selected checks.
-
-`make audit` checks `uv.lock` and the Rust core's `Cargo.lock` for known
-vulnerabilities, and `make audit-fix` upgrades the affected packages and audits
-again. The daily
-[security workflow](https://github.com/chris-ritsen/network-audio-controller/blob/master/.github/workflows/security.yml)
-runs the same audit on `master` and the latest release, and rebuilds the
-published container images when their Python base image is updated.
-
-## Project background
-
-NetAudio is an independent interoperability project and is not affiliated with
-or endorsed by Audinate.
-
-The project grew out of packet capture replay and modification experiments
-first written up in a
-[Gearspace discussion](https://gearspace.com/board/music-computers/1221989-dante-routing-without-dante-controller-possible.html).
+The original NetAudio is released into the public domain under the Unlicense ([LICENSE-UPSTREAM](LICENSE-UPSTREAM)). This fork, like Virgil and Headhunter, is released under the GNU Affero General Public License version 3 or later; see [LICENSE](LICENSE).

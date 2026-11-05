@@ -112,6 +112,7 @@ export default {
   "set sample rate pull-up on device": "장치의 샘플 레이트 풀업 설정",
   "Follower only": "팔로워 전용",
   "PTPv2 domain": "PTPv2 도메인",
+  "PTPv2 multicast": "PTPv2 멀티캐스트",
   "PTPv2 priority 1": "PTPv2 우선순위 1",
   "PTPv2 priority 2": "PTPv2 우선순위 2",
   "Multicast DSCP": "멀티캐스트 DSCP",

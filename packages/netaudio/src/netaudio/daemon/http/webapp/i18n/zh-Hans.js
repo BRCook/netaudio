@@ -112,6 +112,7 @@ export default {
   "set sample rate pull-up on device": "设置设备的采样率上拉",
   "Follower only": "仅限从时钟",
   "PTPv2 domain": "PTPv2 域",
+  "PTPv2 multicast": "PTPv2 组播",
   "PTPv2 priority 1": "PTPv2 优先级 1",
   "PTPv2 priority 2": "PTPv2 优先级 2",
   "Multicast DSCP": "组播 DSCP",

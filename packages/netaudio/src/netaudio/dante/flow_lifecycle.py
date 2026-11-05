@@ -9,7 +9,7 @@ from netaudio import core
 from netaudio.core import _requests, _types
 from netaudio.dante import flows
 from netaudio.dante.channel_capability import apply_channel_capability
-from netaudio.dante.const import PROTOCOL_ARC_2809
+from netaudio.dante.const import PROTOCOL_ARC_280C, PROTOCOL_ARC_2809
 from netaudio.dante.performance_configuration import observed_performance_configuration
 from netaudio.dante.flow_preconditions import refresh_flow_state
 from netaudio.dante.arc_protocol import (
@@ -776,6 +776,10 @@ async def delete_transmit_flow(device, flow_id: int) -> FlowOperationResult:
             if fresh_authoring is not None
             else None
         )
+        # ARC 2.8.12 (0x280C) WING cards report capability word 0x0ff9 but are
+        # deleted with the segmented form (matches the core's planner).
+        if fresh_authoring is not None and fresh_authoring[1] == PROTOCOL_ARC_280C:
+            fresh_family = "segmented"
         if fresh_authoring is None or fresh_authoring[1] != protocol_id or fresh_family != planned_family:
             return _operation_result(
                 operation="delete",

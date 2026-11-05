@@ -258,6 +258,28 @@ def test_clock_source_json_uses_the_native_source_name():
     assert _json(result) == {"clock_source": "internal"}
 
 
+def test_ptpv2_json_reads_the_fresh_port_state():
+    device = _daemon_device()
+    device.clock_status = {"ptpv2_enabled": False}
+    probe = AsyncMock(return_value={"ptpv2_enabled": False})
+    result = _invoke_with_device(["device", "config", "ptpv2"], device, probe_clocking_status=probe)
+    assert _json(result) == {"ptpv2_enabled": False}
+    probe.assert_awaited_once()
+
+
+def test_ptpv2_on_sends_the_change_and_verifies_readback():
+    setter = AsyncMock(return_value=True)
+    probe = AsyncMock(return_value={"ptpv2_enabled": True})
+    result = _invoke_with_device(
+        ["device", "config", "ptpv2", "on"],
+        _daemon_device(),
+        set_ptpv2_enabled=setter,
+        probe_clocking_status=probe,
+    )
+    assert result.exit_code == 0, result.output
+    assert setter.await_args.args[1] is True
+
+
 def test_clock_subdomain_json_carries_text_and_bytes():
     result = _invoke_with_device(["device", "config", "clock-subdomain"], _daemon_device())
     assert _json(result) == {"clock_subdomain": "unset", "clock_subdomain_bytes": [0] * 16}

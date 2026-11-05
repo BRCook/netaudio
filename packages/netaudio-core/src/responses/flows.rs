@@ -184,10 +184,20 @@ pub fn parse_transmitter_flow_status_page(response: &[u8]) -> Option<Transmitter
             parse_transmitter_flow_status_record(response, record_pointer)
         },
     )?;
+    // ARC 2.8.12 (0x280C) Behringer WING Dante cards report 16 transmit flow
+    // slots but number their flows by media-local identifier (Dante Controller
+    // allocates 32, 31, ...), so global identifiers can exceed the slot count.
+    let bounded_flow_identifiers = envelope.protocol_id != crate::protocol::PROTOCOL_ARC_280C;
+    let mut flows = flows;
+    if bounded_flow_identifiers {
+        for flow in &mut flows {
+            flow.media_mode = None;
+        }
+    }
     let mut flow_numbers = HashSet::with_capacity(flows.len());
     let mut media_identities = HashSet::with_capacity(flows.len());
     for flow in &flows {
-        if flow.global_flow_id > u16::from(maximum_flow_slots)
+        if (bounded_flow_identifiers && flow.global_flow_id > u16::from(maximum_flow_slots))
             || !flow_numbers.insert(flow.global_flow_id)
             || !media_identities.insert((flow.media_type_code, flow.media_local_flow_id))
         {
@@ -449,6 +459,18 @@ fn parse_transmitter_flow_status_record(
     let populated_slot_count = u16::try_from(populated_transmitter_channel_ids.len()).ok()?;
     let record = response.get(record_offset..geometry.record_end)?;
     let record_length_bytes = u16::try_from(record.len()).ok()?;
+    // Same layout the segmented create request writes: the second segment
+    // carries the transport selector 8 bytes in (1 = native, 3 = RTP/AES67).
+    let media_mode = geometry
+        .segment_offsets
+        .get(1)
+        .zip(geometry.segment_offsets.get(2))
+        .and_then(|(start, end)| transmitter_flow_status_segment_u16(response, *start, *end, 8))
+        .and_then(|selector| match selector {
+            1 => Some("native_dante"),
+            3 => Some("rtp_aes67"),
+            _ => None,
+        });
 
     Some(TransmitterFlowStatus {
         record_pointer,
@@ -478,6 +500,7 @@ fn parse_transmitter_flow_status_record(
         subscriber_flow_name_pointer,
         subscriber_flow_name,
         raw_record_hexadecimal: bytes_to_hex(record),
+        media_mode,
     })
 }
 

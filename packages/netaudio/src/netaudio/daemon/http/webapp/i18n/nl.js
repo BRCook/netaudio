@@ -112,6 +112,7 @@ export default {
   "set sample rate pull-up on device": "Pull-up van samplefrequentie van apparaat instellen",
   "Follower only": "Alleen volger",
   "PTPv2 domain": "PTPv2-domein",
+  "PTPv2 multicast": "PTPv2-multicast",
   "PTPv2 priority 1": "PTPv2-prioriteit 1",
   "PTPv2 priority 2": "PTPv2-prioriteit 2",
   "Multicast DSCP": "Multicast-DSCP",
