@@ -13,6 +13,7 @@ NetAudio discovers, routes, configures and monitors Dante network audio devices 
 | Switch a device's PTPv2 multicast clock port on or off without enabling AES67 mode | CLI (`device config ptpv2`) and web UI (Clocking panel) |
 | Ask newly found devices for their encoding when it is not otherwise known, so flow plans no longer report an unknown audio format | Daemon |
 | Keep clock status fresh while the Clocking panel is open, for devices that only report it when asked | Web UI |
+| Offer AES67 configuration on devices that list the AES67 setting but do not report their capabilities, and read their lock state so settings can be changed | Daemon |
 | Remove the iOS and iPadOS app packaging | Repository |
 
 The flow changes apply only to devices advertising protocol 0x280C, and the PTPv2 setting is only offered where the device's clock status reports support for it. Other devices behave as they do upstream.

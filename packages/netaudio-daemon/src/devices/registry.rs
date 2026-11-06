@@ -541,6 +541,7 @@ impl DeviceRegistry {
             StatusQuery::Pullup,
             StatusQuery::Codec,
             StatusQuery::Aes67,
+            StatusQuery::Lock,
         ] {
             {
                 let state = device
@@ -571,6 +572,19 @@ impl DeviceRegistry {
                         .properties
                         .get("encoding")
                         .is_none_or(Value::is_null);
+
+                // Settings writes need a known lock state. Devices that never answer
+                // the platform query (the WING) still answer the lock status probe,
+                // so read it whenever the refresh has left the lock state unknown.
+                if matches!(query, StatusQuery::Lock)
+                    && state
+                        .record
+                        .properties
+                        .get("is_locked")
+                        .is_some_and(Value::is_boolean)
+                {
+                    continue;
+                }
 
                 if let Some(capability) = required_capability
                     && !encoding_unknown

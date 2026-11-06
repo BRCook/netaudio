@@ -394,6 +394,20 @@ impl DeviceRecord {
             "aes67_configured_property_advertised".to_owned(),
             json!(directory.aes67_configured_property_advertised),
         );
+
+        // AES67 support normally comes from the platform (Dante model) record.
+        // Devices that never answer that query, such as the Behringer WING, still
+        // list the AES67 setting in their property directory, so treat that as
+        // support until a platform record reports otherwise.
+        if directory.aes67_configured_property_advertised
+            && !self
+                .properties
+                .get("aes67_configuration_supported")
+                .is_some_and(Value::is_boolean)
+        {
+            self.properties
+                .insert("aes67_configuration_supported".to_owned(), json!(true));
+        }
         Ok(())
     }
 
