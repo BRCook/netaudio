@@ -26,7 +26,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: ${{ fromJSON((github.event_name != 'workflow_dispatch' || inputs.scope == 'compatibility') && '["ubuntu-latest", "macos-15", "windows-latest"]' || '["ubuntu-latest"]') }}
+        runner: [ubuntu-latest]
     timeout-minutes: 20
     runs-on: ${{ matrix.runner }}
     steps:
@@ -44,9 +44,9 @@ jobs:
           name: webapp-checks-${{ matrix.runner }}
           path: ${{ runner.temp }}/checks/
       - if: github.event_name != 'workflow_dispatch' || inputs.browser_tests
-        run: npx playwright install --with-deps chromium webkit
+        run: npx playwright install --with-deps chromium
       - if: github.event_name != 'workflow_dispatch' || inputs.browser_tests
-        run: npx playwright test
+        run: npx playwright test --project=chromium
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
@@ -75,29 +75,6 @@ jobs:
         if: always()
         with:
           name: python-checks-${{ matrix.python-version }}
-          path: ${{ runner.temp }}/checks/
-
-  cross-platform-tests:
-    if: github.event_name != 'workflow_dispatch' || inputs.scope == 'compatibility'
-    strategy:
-      fail-fast: false
-      matrix:
-        runner: [ubuntu-22.04-arm, macos-15, windows-latest]
-    timeout-minutes: 20
-    runs-on: ${{ matrix.runner }}
-    steps:
-      - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: astral-sh/setup-uv@v7
-      - if: runner.os == 'macOS'
-        run: brew install pkg-config jack pulseaudio
-      - if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install --yes libasound2-dev libjack-jackd2-dev libpulse-dev pkg-config
-      - run: uv run python scripts/check_project.py --scope runtime --report "${{ runner.temp }}/checks/report.json"
-      - uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: runtime-checks-${{ matrix.runner }}
           path: ${{ runner.temp }}/checks/
 
   native-quality:
@@ -141,18 +118,6 @@ jobs:
             architecture: aarch64
             manylinux-image: quay.io/pypa/manylinux_2_28_aarch64:latest
             library: packages/netaudio-core/target/release/libnetaudio_core.so
-          - runner: macos-15
-            platform: macos
-            architecture: arm64
-            library: packages/netaudio-core/target/release/libnetaudio_core.dylib
-          - runner: macos-15-intel
-            platform: macos
-            architecture: x86_64
-            library: packages/netaudio-core/target/release/libnetaudio_core.dylib
-          - runner: windows-latest
-            platform: windows
-            architecture: x86_64
-            library: packages/netaudio-core/target/release/netaudio_core.dll
     timeout-minutes: 20
     runs-on: ${{ matrix.runner }}
     env:

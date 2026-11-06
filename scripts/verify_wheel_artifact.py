@@ -140,6 +140,11 @@ def verify_wheel(wheel: Path, platform_name: str, architecture: str) -> None:
     with zipfile.ZipFile(wheel) as archive:
         names = archive.namelist()
         native_members = [name for name in names if name.endswith((".so", ".dylib", ".dll", ".a", ".lib", ".rlib"))]
+        if platform_name == "linux":
+            # auditwheel vendors the shared libraries the bundled executables link
+            # (PulseAudio for netaudio-host-pulse) into netaudio.libs/; only the
+            # package's own native library must be netaudio_core.
+            native_members = [name for name in native_members if not name.startswith("netaudio.libs/")]
         if native_members != [expected_library]:
             raise RuntimeError(
                 f"wheel must contain only {expected_library} as a native library; found {native_members}"

@@ -152,6 +152,14 @@ def test_wheel_policy_rejects_foreign_native_artifacts(tmp_path):
         _load_artifact_verifier().verify_wheel(wheel, "linux", "x86_64")
 
 
+def test_wheel_policy_accepts_libraries_vendored_by_auditwheel(tmp_path):
+    wheel = _write_test_wheel(tmp_path, native_data=_elf())
+    with zipfile.ZipFile(wheel, "a") as archive:
+        archive.writestr("netaudio.libs/libpulsecommon-14-beb13e26.0.so", _elf())
+
+    _load_artifact_verifier().verify_wheel(wheel, "linux", "x86_64")
+
+
 def test_wheel_policy_rejects_macos_binary_newer_than_tag(tmp_path):
     wheel = _write_test_wheel(
         tmp_path,
