@@ -155,6 +155,10 @@ def test_wheel_policy_rejects_foreign_native_artifacts(tmp_path):
 def test_wheel_policy_accepts_libraries_vendored_by_auditwheel(tmp_path):
     wheel = _write_test_wheel(tmp_path, native_data=_elf())
     with zipfile.ZipFile(wheel, "a") as archive:
+        for executable in ("netaudio-endpoint", "netaudio-daemon", "netaudio-host-jack", "netaudio-host-pulse"):
+            member = zipfile.ZipInfo(f"netaudio/bin/{executable}")
+            member.external_attr = 0o755 << 16
+            archive.writestr(member, _elf())
         archive.writestr("netaudio.libs/libpulsecommon-14-beb13e26.0.so", _elf())
 
     _load_artifact_verifier().verify_wheel(wheel, "linux", "x86_64")
