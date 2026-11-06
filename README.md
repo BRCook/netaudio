@@ -14,6 +14,7 @@ NetAudio discovers, routes, configures and monitors Dante network audio devices 
 | Ask newly found devices for their encoding when it is not otherwise known, so flow plans no longer report an unknown audio format | Daemon |
 | Keep clock status fresh while the Clocking panel is open, for devices that only report it when asked | Web UI |
 | Offer AES67 configuration on devices that list the AES67 setting but do not report their capabilities, and read their lock state so settings can be changed | Daemon |
+| Let CLI status readbacks (clock, sample rate, encoding, lock) work while the daemon is running | CLI |
 | Remove the iOS and iPadOS app packaging | Repository |
 
 The flow changes apply only to devices advertising protocol 0x280C, and the PTPv2 setting is only offered where the device's clock status reports support for it. Other devices behave as they do upstream.
@@ -138,8 +139,6 @@ Use `netaudio daemon status` to check the daemon and `netaudio daemon logs -f` t
 netaudio daemon stop
 netaudio --log-level DEBUG daemon run
 ```
-
-While the daemon is running, it receives the status reports Dante devices send on UDP port 8702. CLI commands that wait for those reports, such as clock, sample-rate and encoding readbacks, can time out as a result. Use the web interface for those settings, or stop the daemon while using the CLI for them.
 
 The browser's Events page keeps recent events and issues in memory, and restarting the daemon clears them. Save them first with `netaudio events export --file events.json`.
 

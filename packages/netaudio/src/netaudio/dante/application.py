@@ -1224,6 +1224,10 @@ class DanteApplication:
             device._app = self
             device.association_detached = False
             self.devices[server_name] = device
+        # Devices loaded from a running daemon carry their CMC identity but not this
+        # application's association state; without it, every ConMon reply from
+        # them is dropped as unattributed and CLI status probes time out.
+        self.refresh_conmon_associations()
 
     async def clear_configuration(
         self,
