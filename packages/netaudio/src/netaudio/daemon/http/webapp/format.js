@@ -298,11 +298,14 @@ export function preferredLeader(value) {
 }
 
 export function clockStatusFresh(device, now = Date.now()) {
+  if (device.online === false || device.clock_status?.status_supported !== true) return false;
+  // The daemon tracks freshness on its own clock and marks the status stale when
+  // it expires. Comparing its timestamp with this browser's clock instead breaks
+  // whenever the two machines disagree on the time, as on an isolated show
+  // network without time synchronisation, so the daemon's verdict wins.
+  const state = device.clock_status.observation_state;
+  if (state === "fresh") return true;
+  if (state === "stale" || state === "unavailable") return false;
   const age = now - Date.parse(device.clock_observed_at);
-  return (
-    device.online !== false &&
-    device.clock_status?.status_supported === true &&
-    age >= 0 &&
-    age <= 10000
-  );
+  return age >= 0 && age <= 10000;
 }

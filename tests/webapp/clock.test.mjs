@@ -101,6 +101,18 @@ test("the PTPv2 unicast selector needs availability and a reported value", () =>
   assert.doesNotMatch(form, /PTPv2 unicast delay requests/);
 });
 
+test("clock freshness follows the daemon's verdict when the browser clock disagrees", () => {
+  const value = device();
+  value.clock_control_availability = { ptpv2_enabled: true };
+  value.clock_status.ptpv2_enabled = true;
+  value.clock_observed_at = new Date(Date.now() - 60000).toISOString();
+  value.clock_status.observation_state = "fresh";
+  assert.match(render(h(DeviceConfigSection, { device: value })), /PTPv2 multicast/);
+  value.clock_observed_at = new Date().toISOString();
+  value.clock_status.observation_state = "stale";
+  assert.doesNotMatch(render(h(DeviceConfigSection, { device: value })), /PTPv2 multicast/);
+});
+
 test("clock details show mute reasons", () => {
   const html = render(h(StatusSection, { device: device() }));
   assert.ok(html.includes("external-clock problem"));
