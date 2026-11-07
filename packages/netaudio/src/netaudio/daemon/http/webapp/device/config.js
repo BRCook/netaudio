@@ -4,11 +4,12 @@ import { api } from "../api.js";
 import { AsyncButton, FieldRow, Panel } from "../components.js";
 import * as format from "../format.js";
 import { t } from "../i18n.js";
-import { html, useEffect, useRef, useState } from "../lib/preact.js";
+import { html, useRef, useState } from "../lib/preact.js";
 import { deviceRequestName } from "../store.js";
 import {
   operationWritable,
 } from "./availability.js";
+import { useClockRefresh } from "./clock-refresh.js";
 import { isEnrolled } from "./managed.js";
 
 function RenameControl({ device, requestName }) {
@@ -236,17 +237,16 @@ const PORT_CLOCK_FIELDS = [
   ["peer_delay_interval", t("Peer-delay interval (log seconds)"), -128, 127],
 ];
 
-function OnOffSelect({ reference, onChange, label }) {
+// The first option keeps the device's setting. When that setting is known it is
+// shown there ("On (current)"), and only the other value is offered as a change.
+function OnOffSelect({ reference, onChange, label, current }) {
+  const known = typeof current === "boolean";
   return html`<select ref=${reference} aria-label=${label} onChange=${onChange}>
-    <option value="keep">${t("Keep current setting")}</option>
-    <option value="true">${t("On")}</option>
-    <option value="false">${t("Off")}</option>
+    <option value="keep">${known ? t("{value} (current)", { value: current ? t("On") : t("Off") }) : t("Keep current setting")}</option>
+    ${known && current ? null : html`<option value="true">${t("On")}</option>`}
+    ${known && !current ? null : html`<option value="false">${t("Off")}</option>`}
   </select>`;
 }
-
-// Well inside the 10-second freshness window, so a single lost reply does not
-// hide the controls.
-const CLOCK_REFRESH_INTERVAL_MS = 3000;
 
 function ClockingControls({ device, requestName }) {
   const preferred = useRef(null);
@@ -259,23 +259,7 @@ function ClockingControls({ device, requestName }) {
   const allowed = device.clock_control_availability || {};
   const fresh = format.clockStatusFresh(device);
   const managed = isEnrolled(device);
-  const clockReadable = device.online !== false && device.clock_status?.status_supported === true;
-  // Some devices (the Behringer WING) publish clock status only when asked, so
-  // keep it fresh while these controls are on screen instead of hiding them.
-  useEffect(() => {
-    if (managed || !clockReadable || !requestName) return undefined;
-    let inFlight = false;
-    const refresh = () => {
-      if (inFlight) return;
-      inFlight = true;
-      api.refreshClock(requestName).catch(() => {}).finally(() => {
-        inFlight = false;
-      });
-    };
-    if (!format.clockStatusFresh(device)) refresh();
-    const timer = setInterval(refresh, CLOCK_REFRESH_INTERVAL_MS);
-    return () => clearInterval(timer);
-  }, [requestName, managed, clockReadable]);
+  useClockRefresh(device, requestName);
   if (managed) {
     return html`<${Panel} title=${t("Clocking")}>
       <${FieldRow} label=${t("Preferred leader")}>
@@ -298,6 +282,7 @@ function ClockingControls({ device, requestName }) {
   const sourceChoices = device.clock_source_choices || [];
   const preferredAllowed = allowed.preferred_leader === true;
   const sourceAllowed = allowed.clock_source === true && sourceChoices.length > 0;
+  const currentSource = sourceChoices.find((choice) => choice.code === device.clock_source_code);
   const named = allowed.subdomain === true;
   const perPort = allowed.aggregate_ptpv1_unicast_delay_requests === true;
   const unicastAllowed = perPort || allowed.global_unicast_delay_requests === true;
@@ -339,27 +324,29 @@ function ClockingControls({ device, requestName }) {
   };
   return html`
     <${Panel} title=${t("Clocking")}>
-      ${preferredAllowed ? html`<${FieldRow} label=${t("Preferred leader")}><${OnOffSelect} reference=${preferred} label=${t("Preferred leader")} /><//>` : null}
+      ${preferredAllowed ? html`<${FieldRow} label=${t("Preferred leader")}><${OnOffSelect} reference=${preferred} label=${t("Preferred leader")} current=${device.clock_status?.preferred_leader ?? device.preferred_leader} /><//>` : null}
       ${sourceAllowed ? html`<${FieldRow} label=${t("Clock source")}>
         <select ref=${source} aria-label=${t("Clock source")}>
-          <option value="keep">${t("Keep current setting")}</option>
-          ${sourceChoices.map((choice) => html`<option value=${choice.code}>${format.stateLabel(choice.label)}</option>`)}
+          ${currentSource
+            ? html`<option value="keep">${t("{value} (current)", { value: format.stateLabel(currentSource.label) })}</option>`
+            : html`<option value="keep">${t("Keep current setting")}</option>`}
+          ${sourceChoices.filter((choice) => choice !== currentSource).map((choice) => html`<option value=${choice.code}>${format.stateLabel(choice.label)}</option>`)}
         </select>
       <//>` : null}
       ${named ? html`<${FieldRow} label=${t("Clock subdomain")}>
         <input ref=${subdomain} aria-label=${t("Clock subdomain")} defaultValue=${device.clock_subdomain_presentation?.text ?? ""} />
       <//>` : null}
       ${unicastAllowed ? html`<${FieldRow} label=${perPort ? t("PTPv1 unicast delay requests") : t("Unicast delay requests")}>
-        <${OnOffSelect} reference=${unicast} label=${perPort ? t("PTPv1 unicast delay requests") : t("Unicast delay requests")} />
+        <${OnOffSelect} reference=${unicast} label=${perPort ? t("PTPv1 unicast delay requests") : t("Unicast delay requests")}
+          current=${device.clock_status?.[perPort ? "aggregate_ptpv1_unicast_delay_requests" : "global_unicast_delay_requests"]} />
       <//>` : null}
       ${ptpv2Allowed ? html`<${FieldRow} label=${t("PTPv2 multicast")}>
-        <${OnOffSelect} reference=${ptpv2} label=${t("PTPv2 multicast")} />
-        <span>${t("Current")}: ${device.clock_status.ptpv2_enabled ? t("On") : t("Off")}</span>
+        <${OnOffSelect} reference=${ptpv2} label=${t("PTPv2 multicast")} current=${device.clock_status.ptpv2_enabled} />
       <//>` : null}
       ${extendedFields.length || ports.length ? html`<details><summary>${t("Advanced clock settings")}</summary>
         ${extendedFields.map(([name, label, maximum]) => html`<${FieldRow} label=${label}>
           ${maximum == null
-            ? html`<${OnOffSelect} label=${label} onChange=${(event) => setExtended({ ...extended, [name]: event.target.value === "keep" ? null : event.target.value === "true" })} />`
+            ? html`<${OnOffSelect} label=${label} current=${device.clock_status[name]} onChange=${(event) => setExtended({ ...extended, [name]: event.target.value === "keep" ? null : event.target.value === "true" })} />`
             : html`<input type="number" aria-label=${label} min="0" max=${maximum} step="1" defaultValue=${device.clock_status[name]}
                 onChange=${(event) => setExtended({ ...extended, [name]: event.target.value === "" ? null : Number(event.target.value) })} />`}
         <//>`)}
@@ -372,6 +359,7 @@ function ClockingControls({ device, requestName }) {
                 } })} /><//>`)}
             ${port.follower_only != null ? html`<${FieldRow} label=${t("Follower only")}><${OnOffSelect}
               label=${t("Port {port} follower only", { port: port.port_id })}
+              current=${port.follower_only}
               onChange=${(event) => setPortChanges({ ...portChanges, [port.port_id]: {
                 ...portChanges[port.port_id], follower_only: event.target.value === "keep" ? null : event.target.value === "true",
               } })} /><//>` : null}

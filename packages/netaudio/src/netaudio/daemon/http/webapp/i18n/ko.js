@@ -122,6 +122,7 @@ export default {
   "Delay-request interval (log seconds)": "지연 요청 간격(log 초)",
   "Peer-delay interval (log seconds)": "피어 지연 간격(log 초)",
   "Keep current setting": "현재 설정 유지",
+  "{value} (current)": "{value} (현재)",
   "On": "켬",
   "Off": "끔",
   "Clocking": "클럭",

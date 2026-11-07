@@ -88,13 +88,18 @@ pub fn operation(record: &Value, operation: &str) -> Result<Availability> {
                 .is_some_and(|modes| {
                     modes.iter().filter(|mode| !mode["mode"].is_null()).count() >= 2
                 });
+        let source = json!({
+            "fresh": redundancy["state_fresh"] == true,
+            "field_reported": true,
+            "field_applicable": true,
+        });
         if choice_table && facts["supported"] != true {
             facts["supported"] = json!(true);
-            facts["supported_source"] = json!("switch_configuration_choice_table");
+            facts["supported_source"] = source.clone();
         }
         if choice_table && facts["read_only"].is_null() {
             facts["read_only"] = json!(false);
-            facts["read_only_source"] = json!("switch_configuration_choice_table");
+            facts["read_only_source"] = source;
         }
         facts["transport_available"] =
             json!(network_state(record, None, false, None)?.transport_available);

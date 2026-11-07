@@ -122,6 +122,7 @@ export default {
   "Delay-request interval (log seconds)": "தாமதக் கோரிக்கை இடைவெளி (log வினாடிகள்)",
   "Peer-delay interval (log seconds)": "பியர் தாமத இடைவெளி (log வினாடிகள்)",
   "Keep current setting": "தற்போதைய அமைப்பை வைத்திரு",
+  "{value} (current)": "{value} (தற்போதைய)",
   "On": "இயக்கம்",
   "Off": "முடக்கம்",
   "Clocking": "கடிகாரம்",

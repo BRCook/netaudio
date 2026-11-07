@@ -122,6 +122,7 @@ export default {
   "Delay-request interval (log seconds)": "遅延要求間隔（log秒）",
   "Peer-delay interval (log seconds)": "ピア遅延間隔（log秒）",
   "Keep current setting": "現在の設定を維持",
+  "{value} (current)": "{value}（現在）",
   "On": "オン",
   "Off": "オフ",
   "Clocking": "クロック",

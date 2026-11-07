@@ -64,7 +64,8 @@ test("the PTPv2 multicast control needs native availability and port readback", 
   value.clock_control_availability = { ptpv2_enabled: true };
   let form = render(h(DeviceConfigSection, { device: value }));
   assert.match(form, /PTPv2 multicast[^]*?<select(?![^>]*disabled)/);
-  assert.match(form, /Current: Off/);
+  assert.match(form, /Off \(current\)/);
+  assert.doesNotMatch(form, /PTPv2 multicast[^]*?<option value="false">/);
   value.clock_control_availability = { ptpv2_enabled: false };
   form = render(h(DeviceConfigSection, { device: value }));
   assert.doesNotMatch(form, /PTPv2 multicast/);

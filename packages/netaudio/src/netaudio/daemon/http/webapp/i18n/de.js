@@ -122,6 +122,7 @@ export default {
   "Delay-request interval (log seconds)": "Delay-Request-Intervall (log Sekunden)",
   "Peer-delay interval (log seconds)": "Peer-Delay-Intervall (log Sekunden)",
   "Keep current setting": "Aktuelle Einstellung beibehalten",
+  "{value} (current)": "{value} (aktuell)",
   "On": "Ein",
   "Off": "Aus",
   "Clocking": "Taktung",

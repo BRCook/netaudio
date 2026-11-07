@@ -122,6 +122,7 @@ export default {
   "Delay-request interval (log seconds)": "Interval voor vertragingsverzoeken (log seconden)",
   "Peer-delay interval (log seconds)": "Interval voor peer-delay (log seconden)",
   "Keep current setting": "Huidige instelling behouden",
+  "{value} (current)": "{value} (huidig)",
   "On": "Aan",
   "Off": "Uit",
   "Clocking": "Klok",

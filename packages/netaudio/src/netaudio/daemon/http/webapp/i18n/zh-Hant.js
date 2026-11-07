@@ -122,6 +122,7 @@ export default {
   "Delay-request interval (log seconds)": "延遲要求間隔（對數秒）",
   "Peer-delay interval (log seconds)": "對等延遲間隔（對數秒）",
   "Keep current setting": "保持目前設定",
+  "{value} (current)": "{value}（目前）",
   "On": "開啟",
   "Off": "關閉",
   "Clocking": "時鐘",

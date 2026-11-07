@@ -122,6 +122,7 @@ export default {
   "Delay-request interval (log seconds)": "Selang permintaan lengahan (log saat)",
   "Peer-delay interval (log seconds)": "Selang lengahan rakan (log saat)",
   "Keep current setting": "Kekalkan tetapan semasa",
+  "{value} (current)": "{value} (semasa)",
   "On": "Hidup",
   "Off": "Mati",
   "Clocking": "Pemasaan jam",

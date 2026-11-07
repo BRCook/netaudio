@@ -3,7 +3,8 @@ import { aes67Status } from "../aes67.js";
 import * as format from "../format.js";
 import { t } from "../i18n.js";
 import { html } from "../lib/preact.js";
-import { scopedDevices } from "../store.js";
+import { deviceRequestName, scopedDevices } from "../store.js";
+import { useClockRefresh } from "./clock-refresh.js";
 import { DiagnosticsSection } from "./diagnostics.js";
 
 const HIDDEN_WORDS = new Set(["", "unknown", "none", "unset", "unavailable", "null", "undefined", "—"]);
@@ -131,6 +132,7 @@ function subscriptionProblems(problems) {
 }
 
 export function StatusSection({ device }) {
+  useClockRefresh(device, deviceRequestName(device));
   const subscriptions = (device.subscriptions || []).filter((entry) => entry.tx_device);
   const problems = subscriptions.filter(
     (entry) => entry.status && entry.status.severity !== "ok",
