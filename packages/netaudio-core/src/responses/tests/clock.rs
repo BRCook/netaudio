@@ -437,6 +437,7 @@ fn wing_ptpv2_enable_plans_the_observed_control_record() {
 #[test]
 fn wing_ptpv2_unicast_delay_requests_plan_the_extended_bit() {
     let parsed = parse_ptp_clock_status(&wing_clock_status(false)).unwrap();
+    assert_eq!(parsed.aggregate_ptpv1_unicast_delay_requests, Some(false));
     assert_eq!(parsed.aggregate_ptpv2_unicast_delay_requests, Some(false));
     let status = serde_json::to_value(parsed)
         .unwrap()

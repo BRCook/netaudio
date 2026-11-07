@@ -490,11 +490,16 @@ pub fn parse_ptp_clock_status(data: &[u8]) -> Option<PtpClockStatus> {
             port.interface_record = Some(properties.raw_record.clone());
         }
     }
-    let ptpv1: Vec<_> = ports.iter().filter(|p| p.ptp_version == 1).collect();
-    if !ptpv1.is_empty() && ptpv1.iter().all(|p| p.unicast_delay_requests.is_some()) {
-        let first = ptpv1[0].unicast_delay_requests;
-        if ptpv1.iter().all(|p| p.unicast_delay_requests == first) {
-            s.aggregate_ptpv1_unicast_delay_requests = first;
+    // Only ports that report the setting are compared: the WING leaves it
+    // unreported on its disabled PTPv1 unicast port.
+    let ptpv1_unicast: Vec<bool> = ports
+        .iter()
+        .filter(|p| p.ptp_version == 1)
+        .filter_map(|p| p.unicast_delay_requests)
+        .collect();
+    if let Some(&first) = ptpv1_unicast.first() {
+        if ptpv1_unicast.iter().all(|value| *value == first) {
+            s.aggregate_ptpv1_unicast_delay_requests = Some(first);
         }
     }
     // The WING leaves the setting unreported on its disabled PTPv2 unicast port,
