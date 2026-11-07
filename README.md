@@ -16,6 +16,7 @@ NetAudio discovers, routes, configures and monitors Dante network audio devices 
 | Offer AES67 configuration on devices that list the AES67 setting but do not report their capabilities, and read their lock state so settings can be changed | Daemon |
 | Let CLI status readbacks (clock, sample rate, encoding, lock) work while the daemon is running | CLI |
 | Choose the address the HTTP API listens on (`--listen`), for example loopback only | Daemon |
+| Advertise the daemon over mDNS as `netaudio-<hostname>.local`, so it never collides with the machine's own `<hostname>.local` | Daemon |
 | Remove the iOS and iPadOS app packaging | Repository |
 
 The flow changes apply only to devices advertising protocol 0x280C, and the PTPv2 setting is only offered where the device's clock status reports support for it. Other devices behave as they do upstream.

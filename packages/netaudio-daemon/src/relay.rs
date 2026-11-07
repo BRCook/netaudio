@@ -33,6 +33,7 @@ impl Advertisement {
             .to_owned();
         let mut properties = HashMap::from([
             ("version".to_owned(), "1".to_owned()),
+            ("host".to_owned(), hostname.clone()),
             (
                 "scheme".to_owned(),
                 if encrypted { "https" } else { "http" }.to_owned(),
@@ -75,9 +76,13 @@ impl Advertisement {
             "{INSTANCE_PREFIX}{}{INSTANCE_SUFFIX}",
             bounded_label(&self.hostname, maximum_hostname_bytes)
         );
+        // Advertise as netaudio-<hostname>.local so the daemon's records never
+        // collide with the machine's own <hostname>.local, which the system's mDNS
+        // responder (such as Avahi) already publishes. Peers read the plain
+        // hostname from the "host" property.
         let hostname = format!(
             "{}.local.",
-            bounded_label(&self.hostname, MAXIMUM_LABEL_BYTES)
+            bounded_label(&format!("netaudio-{}", self.hostname), MAXIMUM_LABEL_BYTES)
         );
 
         if let Some(fingerprint) = &mut self.fingerprint {

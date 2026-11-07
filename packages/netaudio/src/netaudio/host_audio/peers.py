@@ -121,14 +121,16 @@ class HostAudioPeers:
         info = AsyncServiceInfo(DAEMON_SERVICE_TYPE, name)
         if not await info.async_request(self._zeroconf.zeroconf, RESOLVE_TIMEOUT_MILLISECONDS):
             return
-        server = (info.server or "").removesuffix(".").removesuffix(".local")
+        properties = info.properties or {}
+        # This fork advertises its mDNS host as netaudio-<hostname> and carries the
+        # plain hostname in the "host" property; other daemons advertise the hostname.
+        server = _text(properties, "host") or (info.server or "").removesuffix(".").removesuffix(".local")
         if not server or server.casefold() == self._local_host:
             return
         addresses = info.parsed_scoped_addresses()
         address = next((value for value in addresses if ":" not in value), None)
         if address is None or info.port is None:
             return
-        properties = info.properties or {}
         peer = Peer(
             host=server,
             address=address,

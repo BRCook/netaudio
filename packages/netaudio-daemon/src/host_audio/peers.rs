@@ -29,6 +29,18 @@ pub fn normalized_host(value: &str) -> String {
         .to_owned()
 }
 
+/// The machine a peer daemon runs on. This fork advertises its mDNS host as
+/// netaudio-<hostname> and carries the plain hostname in the "host" property;
+/// other daemons advertise the hostname itself.
+fn peer_host(service: &DiscoveredService) -> &str {
+    service
+        .properties
+        .get("host")
+        .and_then(|host| host.as_deref())
+        .filter(|host| !host.is_empty())
+        .unwrap_or(service.server_name.as_str())
+}
+
 impl Peers {
     pub fn new(local_host: String) -> Self {
         Self {
@@ -43,7 +55,7 @@ impl Peers {
     }
 
     pub fn observe(&self, service: DiscoveredService) {
-        if normalized_host(&service.server_name) == self.local_host {
+        if normalized_host(peer_host(&service)) == self.local_host {
             self.remove(&service.name);
             return;
         }
@@ -75,8 +87,7 @@ impl Peers {
             .borrow()
             .values()
             .map(|service| {
-                service
-                    .server_name
+                peer_host(service)
                     .trim_end_matches('.')
                     .trim_end_matches(".local")
                     .to_owned()
@@ -92,7 +103,7 @@ impl Peers {
         let services = self.services.borrow();
         let mut matches = services
             .values()
-            .filter(|service| normalized_host(&service.server_name) == wanted);
+            .filter(|service| normalized_host(peer_host(service)) == wanted);
         let service = matches.next().with_context(|| {
             format!("No NetAudio server on {host:?} has been found on the network")
         })?;

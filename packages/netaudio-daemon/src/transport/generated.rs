@@ -26,6 +26,7 @@ fn required_names() -> Result<BTreeSet<String>> {
         "localhost".to_owned(),
         hostname.to_owned(),
         format!("{}.local", hostname.trim_end_matches(".local")),
+        format!("netaudio-{}.local", hostname.trim_end_matches(".local")),
     ]
     .into_iter()
     .map(|name| match url::Host::parse(&name)? {
