@@ -80,16 +80,19 @@ pub fn operation(record: &Value, operation: &str) -> Result<Availability> {
         // Devices such as the Behringer WING clear the switch-redundancy capability
         // bit, yet list their redundancy modes in a switch-configuration choice
         // table and accept choice writes, as Dante Controller does. A choice table
-        // offering at least two named modes is treated as a writable setting.
+        // offering at least two named modes is treated as a writable setting. The
+        // current mode may come from interface status; only the mode list must come
+        // from the choice table, since that is what the write selects from.
         let redundancy = &record["dante_redundancy"];
-        let choice_table = redundancy["state_source"]["kind"] == "switch_configuration_status"
+        let choice_table = redundancy["available_modes_source"]
+            == "switch_configuration_choice_table"
             && redundancy["available_modes"]
                 .as_array()
                 .is_some_and(|modes| {
                     modes.iter().filter(|mode| !mode["mode"].is_null()).count() >= 2
                 });
         let source = json!({
-            "fresh": redundancy["state_fresh"] == true,
+            "fresh": redundancy["available_modes_fresh"] == true,
             "field_reported": true,
             "field_applicable": true,
         });
