@@ -237,6 +237,18 @@ const PORT_CLOCK_FIELDS = [
   ["peer_delay_interval", t("Peer-delay interval (log seconds)"), -128, 127],
 ];
 
+// The aggregate PTPv1 unicast setting, or, when the device reports none (the
+// WING leaves it unset because its disabled unicast port has no value), the
+// value every PTPv1 port that reports one agrees on.
+function ptpv1UnicastCurrent(clock) {
+  if (typeof clock?.aggregate_ptpv1_unicast_delay_requests === "boolean")
+    return clock.aggregate_ptpv1_unicast_delay_requests;
+  const values = (clock?.clock_port_records || [])
+    .filter((port) => port.ptp_version === 1 && typeof port.unicast_delay_requests === "boolean")
+    .map((port) => port.unicast_delay_requests);
+  return values.length && values.every((value) => value === values[0]) ? values[0] : null;
+}
+
 // The first option keeps the device's setting. When that setting is known it is
 // shown there ("On (current)"), and only the other value is offered as a change.
 function OnOffSelect({ reference, onChange, label, current }) {
@@ -338,7 +350,7 @@ function ClockingControls({ device, requestName }) {
       <//>` : null}
       ${unicastAllowed ? html`<${FieldRow} label=${perPort ? t("PTPv1 unicast delay requests") : t("Unicast delay requests")}>
         <${OnOffSelect} reference=${unicast} label=${perPort ? t("PTPv1 unicast delay requests") : t("Unicast delay requests")}
-          current=${device.clock_status?.[perPort ? "aggregate_ptpv1_unicast_delay_requests" : "global_unicast_delay_requests"]} />
+          current=${perPort ? ptpv1UnicastCurrent(device.clock_status) : device.clock_status?.global_unicast_delay_requests} />
       <//>` : null}
       ${ptpv2Allowed ? html`<${FieldRow} label=${t("PTPv2 multicast")}>
         <${OnOffSelect} reference=${ptpv2} label=${t("PTPv2 multicast")} current=${device.clock_status.ptpv2_enabled} />

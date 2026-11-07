@@ -75,6 +75,21 @@ test("the PTPv2 multicast control needs native availability and port readback", 
   assert.doesNotMatch(form, /PTPv2 multicast/);
 });
 
+test("the PTPv1 unicast selector shows the value its ports agree on", () => {
+  const value = device();
+  value.clock_control_availability = { aggregate_ptpv1_unicast_delay_requests: true };
+  value.clock_status.aggregate_ptpv1_unicast_delay_requests = null;
+  value.clock_status.clock_port_records = [
+    { record_number: 1, ptp_version: 1, transport_path: "multicast", unicast_delay_requests: false },
+    { record_number: 3, ptp_version: 1, transport_path: "unicast", unicast_delay_requests: null },
+  ];
+  let form = render(h(DeviceConfigSection, { device: value }));
+  assert.match(form, /PTPv1 unicast delay requests[^]*?Off \(current\)/);
+  value.clock_status.clock_port_records[1].unicast_delay_requests = true;
+  form = render(h(DeviceConfigSection, { device: value }));
+  assert.match(form, /PTPv1 unicast delay requests[^]*?Keep current setting/);
+});
+
 test("clock details show mute reasons", () => {
   const html = render(h(StatusSection, { device: device() }));
   assert.ok(html.includes("external-clock problem"));
