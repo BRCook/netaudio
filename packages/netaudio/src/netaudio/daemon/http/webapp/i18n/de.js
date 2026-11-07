@@ -134,6 +134,7 @@ export default {
   "Clock source": "Taktquelle",
   "Clock subdomain": "Takt-Subdomäne",
   "PTPv1 unicast delay requests": "PTPv1-Unicast-Delay-Requests",
+  "PTPv2 unicast delay requests": "PTPv2-Unicast-Delay-Requests",
   "Unicast delay requests": "Unicast-Delay-Requests",
   "Advanced clock settings": "Erweiterte Takteinstellungen",
   "Port {port}": "Port {port}",

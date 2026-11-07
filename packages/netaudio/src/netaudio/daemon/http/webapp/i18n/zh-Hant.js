@@ -134,6 +134,7 @@ export default {
   "Clock source": "時鐘來源",
   "Clock subdomain": "時鐘子域",
   "PTPv1 unicast delay requests": "PTPv1 單播延遲要求",
+  "PTPv2 unicast delay requests": "PTPv2 單播延遲要求",
   "Unicast delay requests": "單播延遲要求",
   "Advanced clock settings": "進階時鐘設定",
   "Port {port}": "連接埠 {port}",

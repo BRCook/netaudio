@@ -134,6 +134,7 @@ export default {
   "Clock source": "Klokbron",
   "Clock subdomain": "Kloksubdomein",
   "PTPv1 unicast delay requests": "PTPv1-unicast-vertragingsverzoeken",
+  "PTPv2 unicast delay requests": "PTPv2-unicast-vertragingsverzoeken",
   "Unicast delay requests": "Unicast-vertragingsverzoeken",
   "Advanced clock settings": "Geavanceerde klokinstellingen",
   "Port {port}": "Poort {port}",

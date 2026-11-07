@@ -18,6 +18,7 @@ NetAudio discovers, routes, configures and monitors Dante network audio devices 
 | Choose the address the HTTP API listens on (`--listen`), for example loopback only | Daemon |
 | Advertise the daemon over mDNS as `netaudio-<hostname>.local`, so it never collides with the machine's own `<hostname>.local` | Daemon |
 | Change Dante redundancy (Switched, Redundant, Separated) on devices that offer it as a list of modes, such as the WING | CLI and web UI |
+| Switch PTPv2 delay requests between multicast and unicast | Web UI and API |
 | Remove the iOS and iPadOS app packaging | Repository |
 
 The flow changes apply only to devices advertising protocol 0x280C, and the PTPv2 setting is only offered where the device's clock status reports support for it. Other devices behave as they do upstream.

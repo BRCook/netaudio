@@ -134,6 +134,7 @@ export default {
   "Clock source": "கடிகார மூலம்",
   "Clock subdomain": "கடிகாரத் துணை டொமைன்",
   "PTPv1 unicast delay requests": "PTPv1 யூனிகாஸ்ட் தாமதக் கோரிக்கைகள்",
+  "PTPv2 unicast delay requests": "PTPv2 யூனிகாஸ்ட் தாமதக் கோரிக்கைகள்",
   "Unicast delay requests": "யூனிகாஸ்ட் தாமதக் கோரிக்கைகள்",
   "Advanced clock settings": "மேம்பட்ட கடிகார அமைப்புகள்",
   "Port {port}": "போர்ட் {port}",

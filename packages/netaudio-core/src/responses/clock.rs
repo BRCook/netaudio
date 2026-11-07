@@ -118,6 +118,9 @@ pub struct PtpClockStatus {
     pub preferred_leader_locked: Option<bool>,
     pub global_unicast_delay_requests: Option<bool>,
     pub aggregate_ptpv1_unicast_delay_requests: Option<bool>,
+    /// The unicast delay request setting the PTPv2 port records that report one
+    /// agree on. `None` when no port reports it or they disagree.
+    pub aggregate_ptpv2_unicast_delay_requests: Option<bool>,
     /// Whether the multicast PTPv2 port records are switched on (their
     /// user-disable bit is clear). `None` when absent, unreported or mixed.
     pub ptpv2_enabled: Option<bool>,
@@ -271,6 +274,7 @@ pub fn parse_ptp_clock_status(data: &[u8]) -> Option<PtpClockStatus> {
         preferred_leader_locked: None,
         global_unicast_delay_requests: None,
         aggregate_ptpv1_unicast_delay_requests: None,
+        aggregate_ptpv2_unicast_delay_requests: None,
         ptpv2_enabled: None,
         clock_subdomain: None,
         mute_flags: None,
@@ -491,6 +495,18 @@ pub fn parse_ptp_clock_status(data: &[u8]) -> Option<PtpClockStatus> {
         let first = ptpv1[0].unicast_delay_requests;
         if ptpv1.iter().all(|p| p.unicast_delay_requests == first) {
             s.aggregate_ptpv1_unicast_delay_requests = first;
+        }
+    }
+    // The WING leaves the setting unreported on its disabled PTPv2 unicast port,
+    // so only ports that report it are compared.
+    let ptpv2_unicast: Vec<bool> = ports
+        .iter()
+        .filter(|p| p.ptp_version == 2)
+        .filter_map(|p| p.unicast_delay_requests)
+        .collect();
+    if let Some(&first) = ptpv2_unicast.first() {
+        if ptpv2_unicast.iter().all(|value| *value == first) {
+            s.aggregate_ptpv2_unicast_delay_requests = Some(first);
         }
     }
     let ptpv2_multicast: Vec<_> = ports

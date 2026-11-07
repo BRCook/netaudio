@@ -134,6 +134,7 @@ export default {
   "Clock source": "クロックソース",
   "Clock subdomain": "クロックサブドメイン",
   "PTPv1 unicast delay requests": "PTPv1ユニキャスト遅延要求",
+  "PTPv2 unicast delay requests": "PTPv2ユニキャスト遅延要求",
   "Unicast delay requests": "ユニキャスト遅延要求",
   "Advanced clock settings": "クロックの詳細設定",
   "Port {port}": "ポート{port}",

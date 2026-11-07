@@ -90,6 +90,17 @@ test("the PTPv1 unicast selector shows the value its ports agree on", () => {
   assert.match(form, /PTPv1 unicast delay requests[^]*?Keep current setting/);
 });
 
+test("the PTPv2 unicast selector needs availability and a reported value", () => {
+  const value = device();
+  value.clock_control_availability = { aggregate_ptpv2_unicast_delay_requests: true };
+  value.clock_status.aggregate_ptpv2_unicast_delay_requests = false;
+  let form = render(h(DeviceConfigSection, { device: value }));
+  assert.match(form, /PTPv2 unicast delay requests[^]*?Off \(current\)/);
+  value.clock_status.aggregate_ptpv2_unicast_delay_requests = null;
+  form = render(h(DeviceConfigSection, { device: value }));
+  assert.doesNotMatch(form, /PTPv2 unicast delay requests/);
+});
+
 test("clock details show mute reasons", () => {
   const html = render(h(StatusSection, { device: device() }));
   assert.ok(html.includes("external-clock problem"));

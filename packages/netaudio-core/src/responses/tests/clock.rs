@@ -435,6 +435,35 @@ fn wing_ptpv2_enable_plans_the_observed_control_record() {
 }
 
 #[test]
+fn wing_ptpv2_unicast_delay_requests_plan_the_extended_bit() {
+    let parsed = parse_ptp_clock_status(&wing_clock_status(false)).unwrap();
+    assert_eq!(parsed.aggregate_ptpv2_unicast_delay_requests, Some(false));
+    let status = serde_json::to_value(parsed)
+        .unwrap()
+        .as_object()
+        .unwrap()
+        .clone();
+    let availability = crate::clock_configuration::control_availability(&status.clone().into());
+    assert!(availability.aggregate_ptpv2_unicast_delay_requests);
+
+    let plan = crate::clock_configuration::plan_configuration(
+        serde_json::from_value(serde_json::json!({
+            "status": status,
+            "changes": {"aggregate_ptpv2_unicast_delay_requests": true},
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+    let sent = build_clock_control(
+        &serde_json::from_value(serde_json::Value::Object(plan.control)).unwrap(),
+        [0x02, 0x00, 0x5e, 0x00, 0x00, 0x01],
+        0x1234,
+    )
+    .unwrap();
+    assert_eq!(sent[24 + 32..24 + 36], [0x04, 0x00, 0x04, 0x00]);
+}
+
+#[test]
 fn ptpv2_enable_requires_revision_0738_and_port_readback() {
     let mut older = wing_clock_status(true);
     older[24..26].copy_from_slice(&0x0734u16.to_be_bytes());

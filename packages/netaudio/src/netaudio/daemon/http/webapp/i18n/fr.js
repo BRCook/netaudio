@@ -134,6 +134,7 @@ export default {
   "Clock source": "Source d’horloge",
   "Clock subdomain": "Sous-domaine d’horloge",
   "PTPv1 unicast delay requests": "Requêtes de délai unicast PTPv1",
+  "PTPv2 unicast delay requests": "Requêtes de délai unicast PTPv2",
   "Unicast delay requests": "Requêtes de délai unicast",
   "Advanced clock settings": "Réglages d’horloge avancés",
   "Port {port}": "Port {port}",

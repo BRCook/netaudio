@@ -19,6 +19,7 @@ pub struct ClockControlAvailability {
     pub multicast_dscp: bool,
     pub ports: bool,
     pub ptpv2_enabled: bool,
+    pub aggregate_ptpv2_unicast_delay_requests: bool,
 }
 
 pub fn default_clock_control_profile() -> u16 {
@@ -103,6 +104,8 @@ impl ClockControl {
             // Enabling the PTPv2 multicast port with a 0x073a control record is
             // confirmed on a Behringer WING reporting clock status 0x0738.
             ptpv2_enabled: rev >= 0x0738,
+            // Same extended record and evidence threshold as ptpv2_enabled.
+            aggregate_ptpv2_unicast_delay_requests: rev >= 0x0738,
             ..Default::default()
         }
     }
@@ -143,14 +146,19 @@ pub fn build_clock_control(
     if !matches!(rev, 0x0734 | 0x073a)
         || (rev == 0x0734 && c.has_extended_changes())
         || c.multicast_dscp.is_some_and(|value| value > 63)
-        || (!c.advanced
-            && (c.ptpv1_enabled.is_some() || c.aggregate_ptpv2_unicast_delay_requests.is_some()))
+        || (!c.advanced && c.ptpv1_enabled.is_some())
     {
         return Err(reject);
     }
 
     let allowed = c.availability();
     if c.ptpv2_enabled.is_some() && !c.advanced && !allowed.ptpv2_enabled {
+        return Err(reject);
+    }
+    if c.aggregate_ptpv2_unicast_delay_requests.is_some()
+        && !c.advanced
+        && !allowed.aggregate_ptpv2_unicast_delay_requests
+    {
         return Err(reject);
     }
     if c.clock_source.is_some() && !c.advanced && !allowed.clock_source {

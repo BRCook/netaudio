@@ -12736,6 +12736,10 @@
             "type": "boolean",
             "description": "Turns the multicast PTPv2 clock port on or off, independent of AES67 mode. Offered when clock_control_availability.ptpv2_enabled is true. Some devices do not keep this setting across a reboot."
           },
+          "aggregate_ptpv2_unicast_delay_requests": {
+            "type": "boolean",
+            "description": "Sends PTPv2 delay requests by unicast instead of multicast on every PTPv2 port. Offered when clock_control_availability.aggregate_ptpv2_unicast_delay_requests is true."
+          },
           "follower_only": {
             "type": "boolean"
           },

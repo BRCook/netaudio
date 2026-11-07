@@ -134,6 +134,7 @@ export default {
   "Clock source": "클럭 소스",
   "Clock subdomain": "클럭 서브도메인",
   "PTPv1 unicast delay requests": "PTPv1 유니캐스트 지연 요청",
+  "PTPv2 unicast delay requests": "PTPv2 유니캐스트 지연 요청",
   "Unicast delay requests": "유니캐스트 지연 요청",
   "Advanced clock settings": "고급 클럭 설정",
   "Port {port}": "포트 {port}",

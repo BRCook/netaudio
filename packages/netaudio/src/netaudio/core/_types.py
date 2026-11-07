@@ -114,6 +114,7 @@ class ClockBasePort(_extensions.TypedDict):
 
 class ClockControlAvailability(_extensions.TypedDict):
     aggregate_ptpv1_unicast_delay_requests: bool
+    aggregate_ptpv2_unicast_delay_requests: bool
     clock_source: bool
     follower_only: bool
     global_unicast_delay_requests: bool
@@ -1092,6 +1093,7 @@ class PtpClockPortRecord(_extensions.TypedDict):
 
 class PtpClockStatus(_extensions.TypedDict):
     aggregate_ptpv1_unicast_delay_requests: _typing.Union[bool, None]
+    aggregate_ptpv2_unicast_delay_requests: _typing.Union[bool, None]
     base_ports: list[ClockBasePort]
     clock_capabilities: _typing.Union[int, None]
     clock_frequency_offset_parts_per_billion: int

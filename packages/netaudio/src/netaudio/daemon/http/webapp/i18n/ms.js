@@ -134,6 +134,7 @@ export default {
   "Clock source": "Sumber jam",
   "Clock subdomain": "Subdomain jam",
   "PTPv1 unicast delay requests": "Permintaan lengahan unicast PTPv1",
+  "PTPv2 unicast delay requests": "Permintaan lengahan unicast PTPv2",
   "Unicast delay requests": "Permintaan lengahan unicast",
   "Advanced clock settings": "Tetapan jam lanjutan",
   "Port {port}": "Port {port}",
