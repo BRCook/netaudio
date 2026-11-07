@@ -30,6 +30,7 @@ const SHUTDOWN_DEADLINE: Duration = Duration::from_secs(30);
 #[derive(Default)]
 pub struct RuntimeOptions {
     pub port: Option<u16>,
+    pub listen: Option<IpAddr>,
     pub interface: Option<String>,
     pub capture: bool,
     pub dissect: bool,
@@ -62,6 +63,19 @@ pub async fn run(
             })
     })?;
     ensure!(port != 0, "daemon port must be nonzero");
+    let listen = match options.listen {
+        Some(address) => Some(address),
+        None => configuration
+            .daemon
+            .get("listen")
+            .map(|address| {
+                address
+                    .as_str()
+                    .and_then(|address| address.parse::<IpAddr>().ok())
+                    .context("[daemon] listen must be an IP address such as 127.0.0.1")
+            })
+            .transpose()?,
+    };
     let settings = configuration.tls()?;
     let identity = if let Some(settings) = &settings {
         ensure!(
@@ -320,7 +334,10 @@ pub async fn run(
         ))
         .layer(middleware::from_fn(crate::http::origin::protect));
     let plain = Listener::bind(
-        http_address(port, identity.is_some()),
+        listen.map_or_else(
+            || http_address(port, identity.is_some()),
+            |address| SocketAddr::new(address, port),
+        ),
         None,
         ListenerOptions::default(),
     )

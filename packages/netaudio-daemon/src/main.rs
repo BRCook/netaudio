@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use netaudio_daemon::configuration::Configuration;
 use netaudio_daemon::runtime::{self, RuntimeOptions};
+use std::net::IpAddr;
 use std::path::PathBuf;
 use tokio_util::sync::CancellationToken;
 use tracing_subscriber::prelude::*;
@@ -15,6 +16,10 @@ struct Arguments {
     profile: Option<String>,
     #[arg(long, env = "NETAUDIO_DAEMON_PORT")]
     port: Option<u16>,
+    /// Address for the plain HTTP API listener, such as 127.0.0.1 to keep the API
+    /// loopback-only. Defaults to every interface without TLS, or loopback with TLS.
+    #[arg(long, env = "NETAUDIO_LISTEN")]
+    listen: Option<IpAddr>,
     #[arg(long)]
     interface: Option<String>,
     #[arg(long)]
@@ -47,6 +52,7 @@ async fn run(arguments: Arguments) -> Result<()> {
         configuration,
         RuntimeOptions {
             port: arguments.port,
+            listen: arguments.listen,
             interface: arguments.interface,
             capture: arguments.capture,
             dissect: arguments.dissect,

@@ -15,6 +15,7 @@ NetAudio discovers, routes, configures and monitors Dante network audio devices 
 | Keep clock status fresh while the Clocking panel is open, for devices that only report it when asked | Web UI |
 | Offer AES67 configuration on devices that list the AES67 setting but do not report their capabilities, and read their lock state so settings can be changed | Daemon |
 | Let CLI status readbacks (clock, sample rate, encoding, lock) work while the daemon is running | CLI |
+| Choose the address the HTTP API listens on (`--listen`), for example loopback only | Daemon |
 | Remove the iOS and iPadOS app packaging | Repository |
 
 The flow changes apply only to devices advertising protocol 0x280C, and the PTPv2 setting is only offered where the device's clock status reports support for it. Other devices behave as they do upstream.
@@ -124,6 +125,8 @@ port = 4780
 ```
 
 To serve plain HTTP on the network instead, set `no_ssl = true` under `[daemon]`.
+
+To keep the API off the network, bind the plain HTTP listener to loopback with `listen = "127.0.0.1"` under `[daemon]`, `netaudio-daemon --listen 127.0.0.1`, or `NETAUDIO_LISTEN=127.0.0.1`. Discovery and device control still use the Dante network as usual, and the local CLI and browser keep working over loopback. An HTTPS listener, if TLS is enabled, still faces the network, so combine this with `no_ssl = true` for a loopback-only daemon.
 
 For a Dante Domain Manager network, `netaudio ddm login --default` guides you through connecting to a server and choosing a domain.
 
