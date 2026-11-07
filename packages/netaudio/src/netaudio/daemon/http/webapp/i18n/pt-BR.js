@@ -296,6 +296,7 @@ export default {
   "Switched": "Comutado",
   "Redundant": "Redundante",
   "Split/Redundant": "Dividido/Redundante",
+  "Separated": "Separado",
   "Static": "Estático",
   "Primary": "Primária",
   "Primary address mode": "Modo de endereço primário",

@@ -77,7 +77,7 @@ pub fn build_set_dante_redundancy(
         (Some(choice), _) => (0x0015u16, choice, false),
         (None, DanteRedundancyMode::Switched) => (0x0013, 0, true),
         (None, DanteRedundancyMode::Redundant) => (0x0013, 1, true),
-        (None, DanteRedundancyMode::SplitRedundant) => {
+        (None, DanteRedundancyMode::SplitRedundant | DanteRedundancyMode::Separated) => {
             return Err(NetaudioError::UnsupportedProtocolOperation)
         }
     };

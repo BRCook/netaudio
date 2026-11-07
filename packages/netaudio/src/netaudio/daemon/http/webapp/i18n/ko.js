@@ -296,6 +296,7 @@ export default {
   "Switched": "스위치드",
   "Redundant": "리던던시",
   "Split/Redundant": "스플릿/리던던시",
+  "Separated": "분리",
   "Static": "정적",
   "Primary": "기본",
   "Primary address mode": "기본 주소 모드",

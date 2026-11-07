@@ -296,6 +296,7 @@ export default {
   "Switched": "交換",
   "Redundant": "冗餘",
   "Split/Redundant": "分離/冗餘",
+  "Separated": "分離",
   "Static": "靜態",
   "Primary": "主網",
   "Primary address mode": "主網位址模式",

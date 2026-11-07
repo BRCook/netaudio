@@ -10,6 +10,7 @@ const modeLabel = (value) =>
     switched: t("Switched"),
     redundant: t("Redundant"),
     split_redundant: t("Split/Redundant"),
+    separated: t("Separated"),
     dynamic: "DHCP",
     dhcp: "DHCP",
     static: t("Static"),

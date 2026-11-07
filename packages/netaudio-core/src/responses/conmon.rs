@@ -250,6 +250,7 @@ pub fn redundancy_mode_for_label(label: &str) -> Option<crate::network::DanteRed
     match label {
         "Redundant" => Some(crate::network::DanteRedundancyMode::Redundant),
         "Split/Redundant" => Some(crate::network::DanteRedundancyMode::SplitRedundant),
+        "Separated" => Some(crate::network::DanteRedundancyMode::Separated),
         "Switched" => Some(crate::network::DanteRedundancyMode::Switched),
         _ => None,
     }

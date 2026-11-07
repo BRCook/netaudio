@@ -296,6 +296,7 @@ export default {
   "Switched": "スイッチド",
   "Redundant": "リダンダント",
   "Split/Redundant": "スプリット/リダンダント",
+  "Separated": "分離",
   "Static": "静的",
   "Primary": "プライマリー",
   "Primary address mode": "プライマリーのアドレスモード",

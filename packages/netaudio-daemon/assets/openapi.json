@@ -3904,7 +3904,8 @@
                     "enum": [
                       "switched",
                       "redundant",
-                      "split_redundant"
+                      "split_redundant",
+                      "separated"
                     ]
                   }
                 },

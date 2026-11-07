@@ -300,7 +300,7 @@ class ControllerLogin(_extensions.TypedDict):
 ControllerLoginResult = _typing.Union[ControllerLogin, None]
 
 
-DanteRedundancyMode = _typing.Literal["switched", "redundant", "split_redundant"]
+DanteRedundancyMode = _typing.Literal["switched", "redundant", "split_redundant", "separated"]
 
 
 class Destination(_extensions.TypedDict):

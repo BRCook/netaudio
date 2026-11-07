@@ -12,7 +12,12 @@ from netaudio.dante.network_configuration import NetworkConfigurationUnverified
 
 
 def mode_label(mode):
-    return {"switched": "Switched", "redundant": "Redundant", "split_redundant": "Split/Redundant"}.get(mode, "Unknown")
+    return {
+        "switched": "Switched",
+        "redundant": "Redundant",
+        "split_redundant": "Split/Redundant",
+        "separated": "Separated",
+    }.get(mode, "Unknown")
 
 
 async def run_redundancy(application, devices, mode, all_devices):
@@ -65,10 +70,10 @@ async def run_redundancy(application, devices, mode, all_devices):
 
 
 def redundancy(
-    mode: Optional[str] = typer.Argument(None, help="switched, redundant, or split_redundant"),
+    mode: Optional[str] = typer.Argument(None, help="switched, redundant, split_redundant, or separated"),
     all_devices: bool = typer.Option(False, "--all", help="Read or apply to all devices."),
 ):
     """Read or set and verify Dante Redundancy. Does not reboot devices."""
-    if mode is not None and mode not in {"switched", "redundant", "split_redundant"}:
-        raise typer.BadParameter("Expected switched, redundant, or split_redundant")
+    if mode is not None and mode not in {"switched", "redundant", "split_redundant", "separated"}:
+        raise typer.BadParameter("Expected switched, redundant, split_redundant, or separated")
     run_command(run_redundancy, mode, all_devices)

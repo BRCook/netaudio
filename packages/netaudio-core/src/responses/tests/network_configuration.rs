@@ -261,6 +261,49 @@ fn switch_choice_status_preserves_current_and_pending_labels() {
 }
 
 #[test]
+fn behringer_wing_switch_configuration_offers_separated_and_matches_dante_controller() {
+    // WING switch-configuration status with Redundant pending, then Dante
+    // Controller's choice writes for Redundant (2) and Separated (3).
+    let status = decode_hexadecimal(concat!(
+        "ffff01ec004f0000001dc1fffe8d5d66417564696e617465073800140000000000030018009400040000007f00010002",
+        "000100005377697463686564000000000000000000000000000000000000000000000000000000000000000000000000",
+        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "000000000000000000000000000000000000000000000000000000000000000000000000000000780000000000000000",
+        "0000000000020000526564756e64616e7400000000000000000000000000000000000000000000000000000000000000",
+        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000006800000030",
+        "000000000000000000030000536570617261746564000000000000000000000000000000000000000000000000000000",
+        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000030",
+        "000000000000004800000000",
+    ));
+    let status = parse_switch_configuration_status(&status).unwrap();
+    assert_eq!(status.redundancy.current, Some(Mode::Switched));
+    assert_eq!(status.redundancy.configured, Some(Mode::Redundant));
+    assert!(status.redundancy.supported.contains(&Mode::Separated));
+
+    for (mode, choice, captured) in [
+        (
+            Mode::Redundant,
+            2,
+            "ffff0024000a2b68525400538bc30000417564696e617465073e00150000006400010002",
+        ),
+        (
+            Mode::Separated,
+            3,
+            "ffff0024000b2b68525400538bc30000417564696e617465073e00150000006400010003",
+        ),
+    ] {
+        let captured = decode_hexadecimal(captured);
+        let encoded =
+            crate::commands::build_set_dante_redundancy(mode, Some(choice), [0; 6], 1).unwrap();
+        // Dante Controller's header names its own host and protocol revision.
+        assert_eq!(&encoded[26..], &captured[26..]);
+    }
+    assert!(crate::commands::build_set_dante_redundancy(Mode::Separated, None, [0; 6], 1).is_err());
+}
+
+#[test]
 fn redundancy_setters_reproduce_independent_controller_requests() {
     for (name, mode, choice) in [
         ("a32_set_switched", Mode::Switched, None),

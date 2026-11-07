@@ -2749,6 +2749,7 @@
             "type": "string",
             "enum": [
               "redundant",
+              "separated",
               "split_redundant",
               "switched"
             ]

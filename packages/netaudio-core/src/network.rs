@@ -215,6 +215,8 @@ pub enum DanteRedundancyMode {
     Switched,
     Redundant,
     SplitRedundant,
+    /// The Behringer WING's third switch-configuration choice ("Separated").
+    Separated,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

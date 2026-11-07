@@ -296,6 +296,7 @@ export default {
   "Switched": "Bersuis",
   "Redundant": "Lewah",
   "Split/Redundant": "Pisah/Lewah",
+  "Separated": "Berasingan",
   "Static": "Statik",
   "Primary": "Utama",
   "Primary address mode": "Mod alamat utama",

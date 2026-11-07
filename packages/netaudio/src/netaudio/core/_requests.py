@@ -64,7 +64,7 @@ class ReportedSource(_extensions.TypedDict):
     fresh: _extensions.NotRequired[_typing.Union[bool, None]]
 
 
-DanteRedundancyMode = _typing.Literal["switched", "redundant", "split_redundant"]
+DanteRedundancyMode = _typing.Literal["switched", "redundant", "split_redundant", "separated"]
 
 
 class RedundancyReadback(_extensions.TypedDict):

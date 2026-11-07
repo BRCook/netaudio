@@ -296,6 +296,7 @@ export default {
   "Switched": "மாற்றப்பட்ட",
   "Redundant": "மிகைமை",
   "Split/Redundant": "பிரிக்கப்பட்டது/மிகைமை",
+  "Separated": "பிரிக்கப்பட்டது",
   "Static": "நிலையானது",
   "Primary": "முதன்மை",
   "Primary address mode": "முதன்மை முகவரிப் பயன்முறை",
