@@ -253,8 +253,19 @@ impl DeviceRegistry {
                     if state.record.services.remove(&name).is_some() {
                         state.generation += 1;
                         state.identity_generation += 1;
+                        // A device that has advertised its control (ARC) service is only
+                        // online while that service is present. Its CMC record can outlive
+                        // it long after the device powers off without withdrawing its
+                        // announcements (a WING's lingered for minutes), which otherwise
+                        // kept it shown as connected.
+                        let control_advertised = state
+                            .record
+                            .properties
+                            .get("control_service_advertised")
+                            .and_then(Value::as_bool)
+                            == Some(true);
                         state.record.online = state.record.service(SERVICE_ARC).is_some()
-                            || state.record.service(SERVICE_CMC).is_some();
+                            || (!control_advertised && state.record.service(SERVICE_CMC).is_some());
                         if !state.record.online {
                             self.metering.invalidate_direct(&state.record.key)?;
                         }

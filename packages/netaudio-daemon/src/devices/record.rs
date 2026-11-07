@@ -61,6 +61,11 @@ impl DeviceRecord {
             }
         }
 
+        if service.service_type == SERVICE_ARC {
+            self.properties
+                .insert("control_service_advertised".to_owned(), json!(true));
+        }
+
         if service.service_type == SERVICE_CMC {
             for (property, field) in [("id", "mac_address"), ("server_vers", "cmc_server_version")]
             {
