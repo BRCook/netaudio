@@ -22,7 +22,7 @@ The flow changes apply only to devices advertising protocol 0x280C, and the PTPv
 
 ## Installation
 
-This fork is installed as part of Virgil and Headhunter and is not published to PyPI.
+This fork is installed as part of Virgil and Headhunter and is not published to PyPI. Its releases are numbered independently of upstream, starting at 1.0.0, and each one attaches Linux wheels (x86-64 and ARM, manylinux_2_28) to its [GitHub release](https://github.com/BRCook/netaudio/releases).
 
 > [!WARNING]
 > `uv tool install netaudio`, `pip install netaudio`, the AUR package and the `s00pcan/netaudio` container all install the **original** netaudio, not this one!
