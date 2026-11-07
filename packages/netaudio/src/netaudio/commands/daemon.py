@@ -58,7 +58,7 @@ def _wait_for_startup(daemon_port, timeout=15):
     return False
 
 
-def _run_foreground(daemon_port):
+def _run_foreground(daemon_port, listen=None):
     from netaudio.cli import state
     from netaudio.common.app_config import settings as app_settings
 
@@ -69,6 +69,8 @@ def _run_foreground(daemon_port):
         typer.echo("Error: the native daemon is missing; rebuild or reinstall NetAudio.", err=True)
         raise typer.Exit(code=1)
     arguments = [str(executable), "--port", str(effective_port)]
+    if listen:
+        arguments.extend(["--listen", listen])
     if app_settings.interface:
         arguments.extend(["--interface", app_settings.interface])
     if state.capture:
@@ -106,9 +108,15 @@ def run(
     daemon_port: Optional[int] = typer.Option(
         None, "--port", help="Daemon HTTP API port.", envvar="NETAUDIO_DAEMON_PORT"
     ),
+    listen: Optional[str] = typer.Option(
+        None,
+        "--listen",
+        help="Address for the HTTP API, such as 127.0.0.1 to keep it off the network.",
+        envvar="NETAUDIO_LISTEN",
+    ),
 ):
     """Run the daemon in the foreground (Ctrl-C to stop)."""
-    _run_foreground(daemon_port)
+    _run_foreground(daemon_port, listen)
 
 
 @app.command()

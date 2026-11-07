@@ -126,7 +126,7 @@ port = 4780
 
 To serve plain HTTP on the network instead, set `no_ssl = true` under `[daemon]`.
 
-To keep the API off the network, bind the plain HTTP listener to loopback with `listen = "127.0.0.1"` under `[daemon]`, `netaudio-daemon --listen 127.0.0.1`, or `NETAUDIO_LISTEN=127.0.0.1`. Discovery and device control still use the Dante network as usual, and the local CLI and browser keep working over loopback. An HTTPS listener, if TLS is enabled, still faces the network, so combine this with `no_ssl = true` for a loopback-only daemon.
+To keep the API off the network, bind the plain HTTP listener to loopback with `listen = "127.0.0.1"` under `[daemon]`, `netaudio daemon run --listen 127.0.0.1`, or `NETAUDIO_LISTEN=127.0.0.1`. Discovery and device control still use the Dante network as usual, and the local CLI and browser keep working over loopback. An HTTPS listener, if TLS is enabled, still faces the network, so combine this with `no_ssl = true` for a loopback-only daemon.
 
 For a Dante Domain Manager network, `netaudio ddm login --default` guides you through connecting to a server and choosing a domain.
 
