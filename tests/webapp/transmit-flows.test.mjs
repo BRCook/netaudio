@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import { WEBAPP } from "./setup.mjs";
 
-const { canonicalFlowRequest, flowEvidenceRows, ReceiverFlows, TransmitFlows } =
+const { canonicalFlowRequest, channelCount, flowEvidenceRows, ReceiverFlows, TransmitFlows } =
   await import(`${WEBAPP}device/flows.js`);
 const { h } = await import("preact");
 const { render } = await import("preact-render-to-string");
@@ -52,6 +52,21 @@ test("browser emits an allocation request for the observed ARC 2.8.9 cohort", ()
   assert.equal(result.identity.media_local_flow_id, 31);
   assert.equal(result.protocol.protocol_id, null);
   assert.deepEqual(result.raw_fields, {});
+});
+
+test("channel ranges expand to one slot per channel", () => {
+  const request = (channels) => canonicalFlowRequest({authoring: modernAuthoring, channels, flowId: "32",
+    mediaMode: "native_dante"});
+  const channels = (result) => result.channel_slots.map((slot) => slot.transmitter_channel);
+  assert.deepEqual(channels(request("1-64")), Array.from({length: 64}, (_, index) => index + 1));
+  assert.deepEqual(channels(request("1-3,8, 10 - 11")), [1, 2, 3, 8, 10, 11]);
+  assert.deepEqual(channels(request("64")), [64]);
+  for (const invalid of ["", "4-2", "1-", "1-2-3", "0-4", "a"]) {
+    assert.throws(() => request(invalid), /ranges/);
+  }
+  assert.equal(channelCount("1-64"), 64);
+  assert.equal(channelCount("64"), 1);
+  assert.equal(channelCount("4-2"), null);
 });
 
 test("fixed authoring is independent of inventory envelope and accepts RTP intent", () => {

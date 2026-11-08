@@ -5,21 +5,32 @@ import { t } from "../i18n.js";
 import { html, useEffect, useState } from "../lib/preact.js";
 import { deviceRequestName } from "../store.js";
 
+// Accepts channel numbers and inclusive ranges, such as "1-64" or "1-8,17,20".
 function parseChannels(text) {
-  const values = String(text)
-    .split(",")
-    .map((value) => Number(value.trim()));
-  if (
-    !values.length ||
-    values.some(
-      (value) => !Number.isInteger(value) || value < 1 || value > 65535,
-    )
-  ) {
-    throw new Error(
-      t("Enter comma-separated positive transmitter channel numbers."),
-    );
+  const values = [];
+  for (const part of String(text).split(",")) {
+    const bounds = part.split("-").map((value) => value.trim());
+    const [first, last] = [Number(bounds[0]), Number(bounds[bounds.length - 1])];
+    const valid = (value) => Number.isInteger(value) && value >= 1 && value <= 65535;
+    if (bounds.length > 2 || bounds.some((value) => value === "") || !valid(first) || !valid(last) || last < first) {
+      values.length = 0;
+      break;
+    }
+    for (let channel = first; channel <= last; channel += 1) values.push(channel);
+  }
+  if (!values.length) {
+    throw new Error(t("Enter transmitter channel numbers or ranges, such as 1-64 or 1,2,5."));
   }
   return values;
+}
+
+// How many channels the Channels field describes, or null while it is invalid.
+export function channelCount(text) {
+  try {
+    return parseChannels(text).length;
+  } catch {
+    return null;
+  }
 }
 
 export function canonicalFlowRequest({
@@ -401,8 +412,9 @@ export function TransmitFlows({ device }) {
           >
             <h3 class="flow-form-title">${t("New multicast flow")}</h3>
             <div class="flow-form-fields">
-              <${FlowField} label=${t("Channels")}>
-                <input aria-label=${t("Transmit flow channels")} value=${channels} onInput=${edit(setChannels)} />
+              <${FlowField} label=${t("Transmit channels")}>
+                <input aria-label=${t("Transmit flow channels")} placeholder="1-64" value=${channels} onInput=${edit(setChannels)} />
+                ${channelCount(channels) ? html`<small>${t("Channels: {count}", { count: channelCount(channels) })}</small>` : null}
               <//>
               <${FlowField} label=${{ media_local_flow_id: t("Media-local flow identifier"), global_flow_id: t("Global flow identifier") }[authoring.identity_field] || t("Flow identifier")}>
                 <input
