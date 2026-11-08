@@ -1,6 +1,6 @@
 use super::{Error, Service, device_identifiers};
 use crate::devices::registry::DeviceRegistry;
-use anyhow::{Context, Result, ensure};
+use anyhow::{Context, Result};
 use netaudio_core::presets::{Document, XmlIdentity};
 use serde_json::{Map, Value, json};
 use std::collections::BTreeSet;
@@ -66,7 +66,7 @@ impl Service {
             .operation
             .try_lock()
             .map_err(|_| Error::Conflict("Another preset operation is in progress.".into()))?;
-        let captured =
+        let (captured, unavailable) =
             tokio::time::timeout(Duration::from_secs(60), devices.capture_preset(&request))
                 .await
                 .map_err(|_| {
@@ -77,7 +77,7 @@ impl Service {
                 })??;
         self.blocking(move || {
             let mut document = Document::new(&request.name);
-            let mut omitted = Vec::new();
+            let mut omitted = unavailable;
 
             for device in captured {
                 document.insert(Value::Object(device.configuration), device.identity)?;
@@ -180,7 +180,7 @@ pub fn identity(record: &Value) -> CapturedDevice {
             ("device_identity".into(), json!(identity)),
         ]),
         identity: XmlIdentity {
-            server_name: record["server_name"].as_str().map(str::to_owned),
+            default_name: text(&["default_name"]),
             mac_address: text(&["mac_address"]),
             manufacturer: text(&["manufacturer"]),
             model_identifier: text(&["model_id"]),
@@ -192,9 +192,21 @@ pub fn identity(record: &Value) -> CapturedDevice {
                 "model_id",
             ]),
             model_version: text(&["friendly_product_version", "product_version"]),
+            server_name: record["server_name"].as_str().map(str::to_owned),
         },
         omitted: Vec::new(),
     }
+}
+
+const MODERN_AUDIO_RECEIVER_FLOW: u64 = 0x1422;
+const NATIVE_RECEIVER_FLOW_TYPE: u64 = 1;
+
+fn native_unicast(flow: &Value, addresses: &BTreeSet<&str>) -> bool {
+    flow["record_type_code"] == MODERN_AUDIO_RECEIVER_FLOW
+        && flow["flow_type_code"] == NATIVE_RECEIVER_FLOW_TYPE
+        && flow["destination_internet_protocol_version_four_address"]
+            .as_str()
+            .is_some_and(|address| addresses.contains(address))
 }
 
 pub fn routing(
@@ -218,21 +230,14 @@ pub fn routing(
     ] {
         let mut names = Map::new();
         for (number, channel) in channels {
-            ensure!(
-                channel
-                    .get("media_type")
-                    .or_else(|| channel.get("ddm_media_type"))
-                    .and_then(Value::as_str)
-                    .is_none_or(|media| media.eq_ignore_ascii_case("audio")),
-                "non-audio channel capture requires media-qualified preset support"
-            );
             let name = channel
                 .get("friendly_name")
                 .and_then(Value::as_str)
                 .filter(|name| !name.is_empty())
-                .or_else(|| channel.get("name").and_then(Value::as_str))
-                .context("channel label is unavailable")?;
-            names.insert(number.to_string(), json!(name));
+                .or_else(|| channel.get("name").and_then(Value::as_str));
+            if let Some(name) = name {
+                names.insert(number.to_string(), json!(name));
+            }
         }
         if !names.is_empty() {
             configuration.insert(field.into(), json!(names));
@@ -249,42 +254,38 @@ pub fn routing(
         .get("receiver_flows")
         .and_then(Value::as_array)
         .context("fresh receiver-flow inventory is unavailable")?;
+    let addresses: BTreeSet<&str> = std::iter::once(&record["ipv4"])
+        .chain(
+            record["interfaces"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .flat_map(|interface| [&interface["address"], &interface["ipv4_address"]]),
+        )
+        .filter_map(Value::as_str)
+        .collect();
     for flow in receiver_flows {
-        ensure!(
-            flow["endpoint_decoding_complete"] == true,
-            "receiver-flow endpoints cannot be represented losslessly"
-        );
-        if let Some(identity) = flow
-            .get("external_identity")
-            .filter(|value| !value.is_null())
-        {
-            ensure!(
-                identity["source_ipv4"].is_string()
-                    && identity["session_id"]
-                        .as_u64()
-                        .is_some_and(|value| value > 0)
-                    && identity["inconsistent_presence_mask"] == 0,
-                "external receiver-flow identity is incomplete or inconsistent"
-            );
+        if native_unicast(flow, &addresses) {
+            continue;
         }
         for identity in flow["effective_subscription_identities"]
             .as_array()
-            .context("receiver-flow subscription identities are unavailable")?
+            .into_iter()
+            .flatten()
         {
-            let number = identity["receiver_channel"]
+            let Some(entry) = identity["receiver_channel"]
                 .as_u64()
-                .context("external receiver channel identity is unavailable")?;
-            let entry = subscriptions
-                .get_mut(&number.to_string())
-                .context("external receiver channel is absent from the channel inventory")?;
-            ensure!(
-                entry.is_null(),
-                "receiver channel {number} has multiple external RTP identities"
-            );
-            let endpoints = identity["interface_endpoints"]
+                .and_then(|number| subscriptions.get_mut(&number.to_string()))
+                .filter(|entry| entry.is_null())
+            else {
+                continue;
+            };
+            let endpoints: Vec<_> = identity["interface_endpoints"]
                 .as_array()
-                .context("external flow endpoints are unavailable")?;
-            let endpoints: Vec<_> = endpoints.iter().map(|endpoint| json!({"ipv4_address": endpoint["ipv4_address"], "udp_port": endpoint["udp_port"]})).collect();
+                .into_iter()
+                .flatten()
+                .map(|endpoint| json!({"ipv4_address": endpoint["ipv4_address"], "udp_port": endpoint["udp_port"]}))
+                .collect();
             *entry = json!({
                 "kind": "external_rtp",
                 "flow_identity": {"source_ipv4": identity["source_ipv4"], "session_id": identity["session_id"]},
@@ -298,27 +299,19 @@ pub fn routing(
         .as_array()
         .context("receiver subscriptions unavailable")?
     {
-        let number = subscription["rx_channel_number"]
+        let Some(entry) = subscription["rx_channel_number"]
             .as_u64()
-            .context("receiver subscription identity is unavailable")?;
-        let entry = subscriptions
-            .get_mut(&number.to_string())
-            .context("receiver subscription is absent from the channel inventory")?;
+            .and_then(|number| subscriptions.get_mut(&number.to_string()))
+        else {
+            continue;
+        };
         let transmitter = subscription["tx_device"]
             .as_str()
             .filter(|name| !name.is_empty());
         let channel = subscription["tx_channel"]
             .as_str()
             .filter(|name| !name.is_empty());
-        ensure!(
-            transmitter.is_some() == channel.is_some(),
-            "receiver channel {number} has an incomplete native subscription identity"
-        );
         if let (Some(transmitter), Some(channel)) = (transmitter, channel) {
-            ensure!(
-                entry.is_null(),
-                "receiver channel {number} reports both native and external subscriptions"
-            );
             *entry =
                 json!({"kind": "native_dante", "tx_device": transmitter, "tx_channel": channel});
         }
@@ -326,32 +319,41 @@ pub fn routing(
     if !subscriptions.is_empty() {
         configuration.insert("rx_subscriptions".into(), json!(subscriptions));
     }
-    ensure!(
-        transmit_flows["unparsed_records"]
-            .as_array()
-            .is_some_and(Vec::is_empty),
-        "transmitter-flow inventory cannot be represented losslessly"
-    );
+    let flows = transmit_flows
+        .get("flows")
+        .and_then(Value::as_array)
+        .context("canonical transmit flows are unavailable")?;
     configuration.insert(
         "transmit_flows".into(),
-        transmit_flows
-            .get("flows")
-            .filter(|value| value.is_array())
-            .context("canonical transmit flows are unavailable")?
-            .clone(),
+        json!(
+            flows
+                .iter()
+                .filter(|flow| flow["flow_type"] != "unicast")
+                .collect::<Vec<_>>()
+        ),
     );
     Ok(())
 }
 
-pub fn clock(configuration: &mut Map<String, Value>, observed: &Map<String, Value>) -> Result<()> {
-    let preferred = observed
+pub fn clock(
+    configuration: &mut Map<String, Value>,
+    omitted: &mut Vec<Value>,
+    device: &str,
+    observed: &Map<String, Value>,
+) -> Result<()> {
+    match observed
         .get("preferred_leader")
         .filter(|value| value.is_boolean())
-        .context("preferred-leader state could not be read")?;
-    configuration.insert("preferred_leader".into(), preferred.clone());
-    let status = observed
-        .get("clock_status")
-        .context("clock status is unavailable")?;
+    {
+        Some(preferred) => {
+            configuration.insert("preferred_leader".into(), preferred.clone());
+        }
+        None => omitted.push(json!({"device": device, "setting": "preferred_leader", "reason": "The preferred-leader state could not be read."})),
+    }
+    let Some(status) = observed.get("clock_status") else {
+        omitted.push(json!({"device": device, "setting": "clock_configuration", "reason": "The clock status could not be read."}));
+        return Ok(());
+    };
     for field in [
         "clock_source_code",
         "clock_subdomain",
@@ -416,14 +418,19 @@ pub fn clock(configuration: &mut Map<String, Value>, observed: &Map<String, Valu
 
 pub fn network(
     configuration: &mut Map<String, Value>,
+    omitted: &mut Vec<Value>,
+    device: &str,
     observed: &Map<String, Value>,
     redundancy_supported: bool,
-) -> Result<()> {
+) {
     let interfaces = observed
         .get("interfaces")
         .and_then(Value::as_array)
-        .filter(|values| !values.is_empty())
-        .context("network interfaces could not be read")?;
+        .map(Vec::as_slice)
+        .unwrap_or_default();
+    if interfaces.is_empty() {
+        omitted.push(json!({"device": device, "setting": "interfaces", "reason": "The network interfaces could not be read."}));
+    }
     let mut result = Vec::new();
     for (index, interface) in interfaces.iter().enumerate() {
         let configured = interface
@@ -446,16 +453,6 @@ pub fn network(
                 .map(|value| (field.to_owned(), value.clone()))
         })
         .collect();
-        let mode = configured["mode"]
-            .as_str()
-            .context("network mode is unknown")?;
-        ensure!(
-            matches!(mode, "static" | "dynamic" | "dhcp"),
-            "network mode is unknown"
-        );
-        if mode == "dhcp" {
-            fields.insert("mode".into(), json!("dynamic"));
-        }
         let identity = interface
             .get("interface")
             .or_else(|| interface.get("identity"))
@@ -472,25 +469,32 @@ pub fn network(
                 1 => "secondary".into(),
                 _ => index.to_string(),
             });
+        match configured["mode"].as_str() {
+            Some("static" | "dynamic") => {}
+            Some("dhcp") => {
+                fields.insert("mode".into(), json!("dynamic"));
+            }
+            _ => {
+                omitted.push(json!({"device": device, "setting": format!("interface {identity}"), "reason": "The interface's addressing mode is unknown."}));
+                continue;
+            }
+        }
         fields.insert("identity".into(), json!(identity));
         result.push(fields);
     }
-    configuration.insert("interfaces".into(), json!(result));
-    if redundancy_supported {
-        let state = observed
-            .get("dante_redundancy")
-            .context("fresh redundancy state is unavailable")?;
-        let configured = &state["configured_mode"];
-        ensure!(
-            state["state_fresh"] == true
-                && state["available_modes_fresh"] == true
-                && !configured.is_null()
-                && state["available_modes"]
-                    .as_array()
-                    .is_some_and(|modes| modes.iter().any(|mode| mode["mode"] == *configured)),
-            "configured redundancy mode or available modes are incomplete"
-        );
-        configuration.insert("redundancy_mode".into(), configured.clone());
+    if !result.is_empty() {
+        configuration.insert("interfaces".into(), json!(result));
     }
-    Ok(())
+    if redundancy_supported {
+        let configured = observed
+            .get("dante_redundancy")
+            .map(|state| &state["configured_mode"])
+            .filter(|configured| !configured.is_null());
+        match configured {
+            Some(configured) => {
+                configuration.insert("redundancy_mode".into(), configured.clone());
+            }
+            None => omitted.push(json!({"device": device, "setting": "redundancy_mode", "reason": "The configured redundancy mode could not be read."})),
+        }
+    }
 }

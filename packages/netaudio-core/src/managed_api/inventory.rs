@@ -126,6 +126,7 @@ impl Observation {
             "model_id": identity.and_then(|item| item.product_model_id.as_deref()),
             "dante_model": device.platform.as_ref().map(|item| item.name.as_str()).unwrap_or(""),
             "dante_model_id": device.platform.as_ref().map(|item| item.platform_id.as_deref()).unwrap_or(Some("")),
+            "default_name": identity.and_then(|item| nonempty(item.default_name.as_deref())),
         });
         let versions = json!({
             "ddm_product_version": identity.and_then(|item| item.product_version.as_deref()),
@@ -235,6 +236,18 @@ impl Projection {
                         })
                         .map(|(key, _)| key)
                         .collect();
+                }
+                let online: BTreeSet<_> = candidates
+                    .iter()
+                    .copied()
+                    .filter(|key| {
+                        direct
+                            .get(*key)
+                            .is_some_and(|record| record["online"] == true)
+                    })
+                    .collect();
+                if candidates.len() > 1 && online.len() == 1 {
+                    candidates = online;
                 }
                 candidates
             })

@@ -101,9 +101,23 @@ impl DeviceRecord {
             }
         }
 
-        self.online = true;
         self.services.insert(service.name.clone(), service);
+        self.online = self.advertised();
         Ok(changed)
+    }
+
+    pub fn advertised(&self) -> bool {
+        // A device that has advertised its control (ARC) service is only present
+        // while that service is. Its CMC record can outlive it long after the
+        // device powers off without withdrawing its announcements (a WING's
+        // lingered for minutes), which otherwise kept it shown as connected.
+        let control_advertised = self
+            .properties
+            .get("control_service_advertised")
+            .and_then(Value::as_bool)
+            == Some(true);
+        self.service(SERVICE_ARC).is_some()
+            || (!control_advertised && self.service(SERVICE_CMC).is_some())
     }
 
     pub fn control_address(&self) -> Option<DeviceAddress> {
@@ -128,7 +142,7 @@ impl DeviceRecord {
     pub fn routing_protocol(&self) -> Result<Option<netaudio_core::protocol::ArcProtocol>> {
         let version = self
             .service(SERVICE_ARC)
-            .and_then(|service| service.property("arcp_vers"));
+            .map(|service| service.property("arcp_vers").unwrap_or_default());
         arc_protocol(version, false).map_err(anyhow::Error::msg)
     }
 

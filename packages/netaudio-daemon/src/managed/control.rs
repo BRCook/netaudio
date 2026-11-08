@@ -12,6 +12,11 @@ use netaudio_core::managed_api::inventory::Observation;
 use serde_json::{Value, json};
 use std::collections::BTreeSet;
 use std::sync::Arc;
+use std::time::Duration;
+use tokio::time::Instant;
+
+const READBACK_INTERVAL: Duration = Duration::from_millis(500);
+const READBACK_LIMIT: Duration = Duration::from_secs(10);
 
 pub struct DeviceRequest {
     pub caller: super::sessions::Caller,
@@ -76,6 +81,21 @@ pub fn evidence(outcome: &Value) -> Value {
     )
 }
 
+fn settles_routes(operation: &ControlOperation) -> bool {
+    match operation {
+        ControlOperation::SampleRate(operation) => !operation.preview,
+        ControlOperation::AudioConfiguration(_)
+        | ControlOperation::FlowAuthoring(_)
+        | ControlOperation::Maintenance(_)
+        | ControlOperation::RenameChannel { .. }
+        | ControlOperation::RenameDevice { .. }
+        | ControlOperation::SetLatency { .. }
+        | ControlOperation::StatusConfiguration(_)
+        | ControlOperation::Subscriptions { .. } => true,
+        _ => false,
+    }
+}
+
 pub fn validate(record: &Value, operation: &ControlOperation) -> Result<(), ControlError> {
     if matches!(
         operation,
@@ -138,7 +158,7 @@ pub fn plan(record: &Value, operation: &ControlOperation) -> Result<Control, Con
                         "receiver channel {number} does not support self-connections"
                     )));
                 }
-                subscription.transmitter_device = ".".into();
+                subscription.transmitter_device = text(record, "name")?.into();
             }
         }
     }
@@ -261,13 +281,33 @@ impl Registry {
         &self,
         request: DeviceRequest,
     ) -> Result<ControlCompletion, ControlError> {
-        let _configuration = self.configuration_change.lock().await;
-        self.control_locked(request).await
+        let configuration = self.configuration_change.lock().await;
+        let server = request.record["ddm_server_profile"].as_str().map(str::to_owned);
+        let settles = settles_routes(&request.operation);
+        let result = self.control_locked(request, Some(configuration)).await;
+        let sent = |outcome: &Value| outcome["request_sent"] == true || outcome["change_sent"] == true;
+        let changed = match &result {
+            Ok(completion) => {
+                completion.acknowledged_commands > 0
+                    || completion.observation.as_ref().is_some_and(sent)
+            }
+            Err(ControlError::Managed { result, .. }) => sent(result),
+            Err(_) => false,
+        };
+        if settles
+            && changed
+            && let Some(server) = server
+            && let Err(error) = self.schedule_settle_readbacks(&server)
+        {
+            tracing::warn!(%error, server, "managed settle readback could not be scheduled");
+        }
+        result
     }
 
     pub(super) async fn control_locked(
         &self,
         request: DeviceRequest,
+        configuration: Option<tokio::sync::MutexGuard<'_, ()>>,
     ) -> Result<ControlCompletion, ControlError> {
         self.load_configuration().await.map_err(control_error)?;
         let revision = self.configuration_revision()?;
@@ -443,19 +483,26 @@ impl Registry {
             }
         }
         let acknowledgement_error = audit.acknowledgement(&self.journal, &value).await.err();
-        let readback = async {
-            if !self.refresh_server(server).await? {
-                return Err(Error::Response("Managed command readback is unavailable"));
+        let acknowledged = value["accepted"] == true;
+        if acknowledged {
+            for event in pending_events(&request.record, &request.operation) {
+                if let Err(error) = self.model.publish(event) {
+                    tracing::warn!(%error, "managed subscription progress was not published");
+                }
             }
-            let inventory = self.command_inventory(server, &source)?;
-            let target = inventory.device(identifier)?;
-            if target.domain_id.as_deref() != Some(domain) {
-                return Err(Error::Conflict(
-                    "Managed device changed domains during the command",
-                ));
-            }
-            Ok(target.clone())
         }
+        drop(configuration);
+        let readback = settle(
+            || self.command_readback(server, &source, identifier, domain),
+            |observed| {
+                !acknowledged
+                    || observed.as_ref().is_ok_and(|target| {
+                        matches(&command, target) && !establishing(&command, target)
+                    })
+            },
+            READBACK_INTERVAL,
+            READBACK_LIMIT,
+        )
         .await;
         match readback {
             Ok(observed) => {
@@ -514,6 +561,26 @@ impl Registry {
         })
     }
 
+    async fn command_readback(
+        &self,
+        server: &str,
+        source: &Arc<Source>,
+        identifier: &str,
+        domain: &str,
+    ) -> Result<Observation, Error> {
+        if !self.refresh_queued(server).await? {
+            return Err(Error::Response("Managed command readback is unavailable"));
+        }
+        let inventory = self.command_inventory(server, source)?;
+        let target = inventory.device(identifier)?;
+        if target.domain_id.as_deref() != Some(domain) {
+            return Err(Error::Conflict(
+                "Managed device changed domains during the command",
+            ));
+        }
+        Ok(target.clone())
+    }
+
     pub(super) async fn fresh_target(
         &self,
         request: &DeviceRequest,
@@ -521,7 +588,7 @@ impl Registry {
         revision: &str,
     ) -> Result<FreshTarget, ControlError> {
         let server = text(&request.record, "ddm_server_profile")?;
-        if !self.refresh_server(server).await.map_err(control_error)? {
+        if !self.refresh_queued(server).await.map_err(control_error)? {
             return Err(ControlError::ObservationUnavailable(
                 "Current managed inventory is unavailable".into(),
             ));
@@ -579,6 +646,83 @@ impl Registry {
     }
 }
 
+async fn settle<T, R, F>(
+    mut read: R,
+    settled: impl Fn(&T) -> bool,
+    interval: Duration,
+    limit: Duration,
+) -> T
+where
+    R: FnMut() -> F,
+    F: Future<Output = T>,
+{
+    let deadline = Instant::now() + limit;
+    loop {
+        let result = read().await;
+        if settled(&result) || Instant::now() + interval > deadline {
+            return result;
+        }
+        tokio::time::sleep(interval).await;
+    }
+}
+
+fn pending_events(record: &Value, operation: &ControlOperation) -> Vec<Value> {
+    let ControlOperation::Subscriptions { changes } = operation else {
+        return Vec::new();
+    };
+    changes
+        .iter()
+        .map(|change| {
+            let (action, transmitter_device, transmitter_channel) = match change {
+                SubscriptionChange::Set {
+                    transmitter_device,
+                    transmitter_channel,
+                    ..
+                } => (
+                    "add",
+                    transmitter_device.as_str(),
+                    transmitter_channel.as_str(),
+                ),
+                SubscriptionChange::Clear { .. } => ("remove", "", ""),
+            };
+            json!({
+                "event": "subscription_pending",
+                "action": action,
+                "server_name": record["server_name"],
+                "rx_device": record["server_name"],
+                "rx_channel": change.receiver_channel(),
+                "tx_channel": transmitter_channel,
+                "tx_device": transmitter_device,
+            })
+        })
+        .collect()
+}
+
+fn establishing(command: &Control, target: &Observation) -> bool {
+    let Control::Subscriptions { subscriptions } = command else {
+        return false;
+    };
+    subscriptions
+        .iter()
+        .filter(|subscription| !subscription.transmitter_channel.is_empty())
+        .any(|subscription| {
+            target
+                .device
+                .rx_channels
+                .iter()
+                .flatten()
+                .find(|channel| channel.index == subscription.receiver_channel as i64)
+                .and_then(|channel| channel.status.as_deref())
+                .is_some_and(|status| {
+                    netaudio_core::subscription_status::classification_for_identifier(
+                        &status.trim().to_ascii_uppercase(),
+                    )
+                    .severity
+                        == "progress"
+                })
+        })
+}
+
 fn matches(command: &Control, target: &Observation) -> bool {
     match command {
         Control::Name { name } => {
@@ -605,8 +749,9 @@ fn matches(command: &Control, target: &Observation) -> bool {
                 return false;
             };
             let source_matches = device == subscription.transmitter_device
-                || subscription.transmitter_device == "."
-                    && device == netaudio_core::managed_api::inventory::device_name(&target.device);
+                || device == "."
+                    && subscription.transmitter_device
+                        == netaudio_core::managed_api::inventory::device_name(&target.device);
             source_matches
                 && channel.subscribed_channel.as_deref()
                     == Some(subscription.transmitter_channel.as_str())

@@ -9,7 +9,8 @@ const EVENT_LOG_LIMIT = 400;
 const METER_TABLE_INTERVAL_MILLISECONDS = 250;
 const RECONNECT_DELAY_MILLISECONDS = 2000;
 
-const PENDING_SUBSCRIPTION_TIMEOUT_MILLISECONDS = 8000;
+const PENDING_SUBSCRIPTION_TIMEOUT_MILLISECONDS = 10000;
+const SETTLING_SUBSCRIPTION_STATES = new Set(["in_progress", "pending", "resolved", "resolving", "unresolved"]);
 
 export const connectionState = signal("connecting");
 export const devices = signal(readInventoryCache());
@@ -137,10 +138,34 @@ export function pendingKey(receiverName, receiveChannelNumber) {
   return `${receiverName}\u0000${receiveChannelNumber}`;
 }
 
+function samePendingChange(entry, payload) {
+  return entry.action === payload.action
+    && entry.external_slot === payload.external_slot
+    && entry.external_source_key === payload.external_source_key
+    && (payload.action === "remove"
+      || (entry.tx_channel === payload.tx_channel && entry.tx_device === payload.tx_device));
+}
+
+let pendingSequence = 0;
+
+function releasePending(key, entry) {
+  const current = pendingSubscriptions.value;
+  if (current[key]?.sequence === entry.sequence) {
+    const next = { ...current };
+    delete next[key];
+    pendingSubscriptions.value = next;
+  }
+}
+
 function markPending(payload) {
   const key = pendingKey(payload.rx_device, payload.rx_channel);
+  const existing = pendingSubscriptions.value[key];
+  if (existing && samePendingChange(existing, payload)) {
+    return existing;
+  }
   const entry = {
     action: payload.action,
+    sequence: ++pendingSequence,
     since: Date.now(),
     tx_channel: payload.tx_channel,
     tx_device: payload.tx_device,
@@ -148,19 +173,27 @@ function markPending(payload) {
     external_slot: payload.external_slot,
   };
   pendingSubscriptions.value = { ...pendingSubscriptions.value, [key]: entry };
-  setTimeout(() => {
-    const current = pendingSubscriptions.value;
-    if (current[key] === entry) {
-      const next = { ...current };
-      delete next[key];
-      pendingSubscriptions.value = next;
-    }
-  }, PENDING_SUBSCRIPTION_TIMEOUT_MILLISECONDS);
+  setTimeout(() => releasePending(key, entry), PENDING_SUBSCRIPTION_TIMEOUT_MILLISECONDS);
+  return entry;
+}
+
+export async function requestSubscriptionChange(change, perform) {
+  const entry = markPending(change);
+  const outcome = await perform();
+  if (!outcome.ok) {
+    releasePending(pendingKey(change.rx_device, change.rx_channel), entry);
+  }
+  return outcome;
 }
 
 export function markExternalPending(receiver, channel, sourceKey, slot, clear) {
   markPending({rx_device: receiver, rx_channel: channel, action: clear ? "remove" : "add",
     external_source_key: sourceKey, external_slot: slot});
+}
+
+function subscriptionSettled(subscription) {
+  const status = subscription?.status;
+  return !status || (status.severity !== "progress" && !SETTLING_SUBSCRIPTION_STATES.has(status.state));
 }
 
 export function clearPendingForDevice(device) {
@@ -181,7 +214,12 @@ export function clearPendingForDevice(device) {
       ? !subscription?.tx_device
       : subscription?.tx_device === entry.tx_device && subscription?.tx_channel === entry.tx_channel);
     if (names.has(receiverName) && confirmed) {
-      changed = true;
+      if (!entry.external_source_key && entry.action === "add" && !subscriptionSettled(subscription)) {
+        next[key] = entry.applied ? entry : { ...entry, applied: true };
+        changed ||= !entry.applied;
+      } else {
+        changed = true;
+      }
       continue;
     }
     next[key] = entry;
@@ -394,6 +432,19 @@ export function deviceByName(deviceName) {
     return null;
   }
   const matches = Object.values(scopedDevices.value).filter((device) => device.name === deviceName || device.server_name === deviceName);
+  return matches.length === 1 ? matches[0] : null;
+}
+
+const renamedIdentities = new Map();
+
+export function recordDeviceRename(previousName, device) {
+  if (previousName && device?.inventory_id) renamedIdentities.set(previousName, device.inventory_id);
+}
+
+export function renamedDevice(deviceName) {
+  const identity = renamedIdentities.get(deviceName);
+  if (!identity) return null;
+  const matches = Object.values(scopedDevices.value).filter((device) => device.inventory_id === identity && device.name !== deviceName);
   return matches.length === 1 ? matches[0] : null;
 }
 
