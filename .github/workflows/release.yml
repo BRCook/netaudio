@@ -47,10 +47,15 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - uses: astral-sh/setup-uv@v7
       - run: sudo apt-get update && sudo apt-get install --yes libasound2-dev libjack-jackd2-dev libpulse-dev pkg-config
       - run: cargo test --manifest-path packages/netaudio-core/Cargo.toml
+      # The package is only built here to run the tests, so skip link-time
+      # optimisation; the released wheels below are still fully optimised.
       - run: uv run pytest -q
+        env:
+          CARGO_PROFILE_RELEASE_LTO: "false"
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -58,7 +63,7 @@ jobs:
       - run: node --import ./tests/webapp/loader.mjs --import ./tests/webapp/setup.mjs --test "tests/webapp/*.test.mjs"
 
   build-wheel:
-    needs: test
+    needs: check-version
     strategy:
       fail-fast: false
       matrix:
@@ -80,14 +85,23 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: astral-sh/setup-uv@v7
       - run: sudo apt-get update && sudo apt-get install --yes libasound2-dev libjack-jackd2-dev libpulse-dev pkg-config
+      - uses: actions/cache@v4
+        with:
+          path: |
+            target
+            .cargo-home/registry
+            .cargo-home/git
+          key: manylinux-${{ matrix.architecture }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: manylinux-${{ matrix.architecture }}-
       - name: Build at the manylinux 2.28 compatibility floor
         shell: bash
         run: |
           docker run --pull always --rm \
             --volume "$PWD:/project" --workdir /project \
             "${{ matrix.manylinux-image }}" /bin/bash -euxo pipefail -c '
+              export CARGO_HOME=/project/.cargo-home
               curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
-              export PATH="$HOME/.cargo/bin:/opt/python/cp39-cp39/bin:$PATH"
+              export PATH="$CARGO_HOME/bin:/opt/python/cp39-cp39/bin:$PATH"
               python -m pip install --disable-pip-version-check uv auditwheel
               dnf install -y alsa-lib-devel jack-audio-connection-kit-devel pulseaudio-libs-devel pkgconf-pkg-config
               uv build --wheel
@@ -127,7 +141,7 @@ jobs:
           path: dist/*.whl
 
   release:
-    needs: build-wheel
+    needs: [test, build-wheel]
     timeout-minutes: 30
     runs-on: ubuntu-latest
     permissions:
