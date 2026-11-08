@@ -12,7 +12,7 @@ use crate::state::ReadModel;
 use anyhow::{Context, Result, bail};
 use futures_util::StreamExt;
 use netaudio_core::parser::ChannelCount;
-use netaudio_core::protocol::{SERVICE_ARC, SERVICE_CMC};
+use netaudio_core::protocol::SERVICE_CMC;
 use netaudio_core::responses::{DeviceSettings, PropertyDirectory};
 use netaudio_core::responses::{NetaudioNotification, parse_notification_envelope};
 use serde::Serialize;
@@ -253,19 +253,7 @@ impl DeviceRegistry {
                     if state.record.services.remove(&name).is_some() {
                         state.generation += 1;
                         state.identity_generation += 1;
-                        // A device that has advertised its control (ARC) service is only
-                        // online while that service is present. Its CMC record can outlive
-                        // it long after the device powers off without withdrawing its
-                        // announcements (a WING's lingered for minutes), which otherwise
-                        // kept it shown as connected.
-                        let control_advertised = state
-                            .record
-                            .properties
-                            .get("control_service_advertised")
-                            .and_then(Value::as_bool)
-                            == Some(true);
-                        state.record.online = state.record.service(SERVICE_ARC).is_some()
-                            || (!control_advertised && state.record.service(SERVICE_CMC).is_some());
+                        state.record.online = state.record.advertised();
                         if !state.record.online {
                             self.metering.invalidate_direct(&state.record.key)?;
                         }
@@ -383,9 +371,26 @@ impl DeviceRegistry {
             .read()
             .map_err(|_| anyhow::anyhow!("device registry lock poisoned"))?
             .get(key)
-            .cloned()
-            .context("device has no native control transport")?;
-        self.refresh_entry(device, None).await
+            .cloned();
+        match device {
+            Some(device) => self.refresh_entry(device, None).await,
+            None if crate::managed::control::required(&record) => {
+                let completion = self
+                    .apply(reference, ControlOperation::InspectStatus(Inspection::Settings))
+                    .await
+                    .map_err(|error| anyhow::anyhow!(error.to_string()))?;
+                let mut errors = BTreeMap::new();
+                if !completion.readback_errors.is_empty() {
+                    errors.insert("settings", completion.readback_errors.join("; "));
+                }
+                Ok(RefreshReport {
+                    observed: Vec::new(),
+                    errors,
+                    superseded: false,
+                })
+            }
+            None => bail!("device has no native control transport"),
+        }
     }
 
     pub fn request_refresh(&self, reference: &str) -> Result<()> {
@@ -565,15 +570,6 @@ impl DeviceRegistry {
                     return Ok(());
                 }
 
-                let required_capability = match query {
-                    StatusQuery::SampleRate => Some("sample_rate_configuration_supported"),
-                    StatusQuery::Encoding => Some("encoding_configuration_supported"),
-                    StatusQuery::Pullup => Some("sample_rate_pullup_configuration_supported"),
-                    StatusQuery::Codec => Some("generic_codec_control_supported"),
-                    StatusQuery::Aes67 => Some("aes67_configuration_supported"),
-                    _ => None,
-                };
-
                 // Reading encoding status is harmless even where encoding is not
                 // configurable, and it is the only encoding source for devices
                 // whose channel metadata omits supported encodings (the WING).
@@ -597,7 +593,7 @@ impl DeviceRegistry {
                     continue;
                 }
 
-                if let Some(capability) = required_capability
+                if let Some(capability) = query.required_capability()
                     && !encoding_unknown
                     && state
                         .record
@@ -724,18 +720,29 @@ impl DeviceRegistry {
             .map_err(|_| anyhow::anyhow!("managed control already configured"))
     }
 
-    pub fn bind_managed_precondition(
+    pub fn bind_precondition(
         &self,
         reference: &str,
+        operation: &ControlOperation,
         condition: &mut Value,
     ) -> Result<(), ControlError> {
-        if let Some(record) = self.model.device(reference)?
-            && crate::managed::control::required(&record)
-        {
+        let Some(record) = self.model.device(reference)? else {
+            return Ok(());
+        };
+        if crate::managed::control::required(&record) {
             let managed = self.managed.get().ok_or_else(|| {
                 ControlError::Unavailable("Managed control is unavailable".into())
             })?;
             condition["managed_configuration"] = json!(managed.configuration_revision()?);
+        } else if *condition == operation.precondition(&record) {
+            let device = self.controlled_device(reference)?;
+            let presented = device
+                .state
+                .lock()
+                .map_err(|_| anyhow::anyhow!("device lock poisoned"))?
+                .record
+                .presentation()?;
+            *condition = operation.precondition(&presented);
         }
         Ok(())
     }
@@ -928,7 +935,7 @@ impl DeviceRegistry {
             ));
         }
 
-        let (generation, address, protocol_identifier) = {
+        let (generation, identity, address, protocol_identifier) = {
             let state = device
                 .state
                 .lock()
@@ -953,7 +960,12 @@ impl DeviceRegistry {
                 .record
                 .control_address()
                 .context("device has no routing service")?;
-            (state.generation, address, protocol.protocol_id)
+            (
+                state.generation,
+                state.identity_generation,
+                address,
+                protocol.protocol_id,
+            )
         };
         let mut owned_transport = device.transport.lock().await;
 
@@ -1138,7 +1150,7 @@ impl DeviceRegistry {
         };
         let initial_audio = match audio_kind {
             Some(kind) => Some(
-                self.read_audio(device, transport, generation, kind, None)
+                self.read_audio(device, transport, identity, kind, None)
                     .await
                     .map_err(|error| {
                         tracing::warn!(%error, "initial audio configuration observation unavailable");
@@ -1212,7 +1224,7 @@ impl DeviceRegistry {
                         .read_audio(
                             device,
                             transport,
-                            generation,
+                            identity,
                             operation.kind,
                             Some(&operation),
                         )

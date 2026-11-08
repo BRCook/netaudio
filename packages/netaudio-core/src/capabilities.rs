@@ -207,10 +207,6 @@ pub fn availability(request: AvailabilityRequest) -> Availability {
             Some(false) => reasons.push("managed_permission_denied"),
             None => reasons.push("managed_permission_missing"),
         }
-
-        if request.operation == Locking {
-            reasons.push("managed_transport_unavailable");
-        }
     }
 
     let write_permitted = reasons.iter().all(|reason| {

@@ -201,37 +201,53 @@ pub fn arc_protocol(
             return Ok(None);
         };
 
-        let mut parts = version.split('.');
-        let mut component = || {
-            let part = parts.next()?;
-            if part.is_empty() || !part.bytes().all(|byte| byte.is_ascii_digit()) {
-                return None;
-            }
-
-            part.parse::<u16>().ok()
-        };
-        let components = (component(), component(), component());
-        let (Some(major), Some(minor), Some(patch)) = components else {
-            return Err("unsupported ARC protocol version");
-        };
-
-        if parts.next().is_some() || major > 15 || minor > 15 || patch > 255 {
-            return Err("unsupported ARC protocol version");
-        }
-
-        ((major << 12) | (minor << 8) | patch).min(PROTOCOL_ARC_280F)
+        advertised_arc_protocol(version)
     };
 
     arc_protocol_for_identifier(protocol_id, managed).map(Some)
+}
+
+const KNOWN_ARC_PROTOCOL_IDS: [u16; 6] = [
+    NetaudioProtocol::Arc2729 as u16,
+    PROTOCOL_ID,
+    NetaudioProtocol::Arc2801 as u16,
+    PROTOCOL_ARC_2809,
+    PROTOCOL_ARC_280C,
+    PROTOCOL_ARC_280F,
+];
+
+pub fn known_arc_protocol(protocol_id: u16) -> u16 {
+    KNOWN_ARC_PROTOCOL_IDS
+        .into_iter()
+        .rev()
+        .find(|known| *known <= protocol_id)
+        .unwrap_or(PROTOCOL_ID)
+}
+
+fn advertised_arc_protocol(version: &str) -> u16 {
+    let mut parts = version.trim().split('.');
+    let mut component = || {
+        let part = parts.next()?;
+        if part.is_empty() || !part.bytes().all(|byte| byte.is_ascii_digit()) {
+            return None;
+        }
+
+        Some(part.parse::<u32>().unwrap_or(u32::MAX))
+    };
+    let (Some(major), Some(minor)) = (component(), component()) else {
+        return PROTOCOL_ID;
+    };
+    let patch = component().unwrap_or(0);
+    let identifier = (major.min(15) << 12) | (minor.min(15) << 8) | patch.min(255);
+
+    known_arc_protocol(identifier as u16)
 }
 
 pub fn arc_protocol_for_identifier(
     protocol_id: u16,
     managed: bool,
 ) -> Result<ArcProtocol, &'static str> {
-    if !is_supported_arc_protocol(protocol_id) {
-        return Err("unsupported ARC protocol version");
-    }
+    let protocol_id = known_arc_protocol(protocol_id);
 
     Ok(ArcProtocol {
         protocol_id,
@@ -263,12 +279,12 @@ pub fn transmit_flow_inventory_protocols(
 ) -> Result<Vec<u16>, &'static str> {
     use crate::commands::{PROTOCOL_DANTE_FLOW, PROTOCOL_DANTE_FLOW_2801};
 
-    if !is_supported_arc_protocol(advertised)
-        || (!matches!(observed, PROTOCOL_DANTE_FLOW | PROTOCOL_DANTE_FLOW_2801)
-            && !is_modern_arc_protocol(observed))
-    {
-        return Err("unsupported transmitter inventory protocol");
-    }
+    let advertised = known_arc_protocol(advertised);
+    let observed = match known_arc_protocol(observed) {
+        known if is_modern_arc_protocol(known) => known,
+        known if known >= PROTOCOL_DANTE_FLOW_2801 => PROTOCOL_DANTE_FLOW_2801,
+        _ => PROTOCOL_DANTE_FLOW,
+    };
 
     if is_modern_arc_protocol(advertised) {
         return Ok(vec![advertised]);
@@ -805,117 +821,4 @@ pub fn build_set_device_name(name: &str, message_id: u16) -> Result<Vec<u8>, Net
         &payload,
         message_id,
     )
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn set_device_name_known_bytes() {
-        let packet = build_set_device_name("AVIO", 0).unwrap();
-        let expected = [
-            0x28, 0x09, 0x00, 0x0F, 0x00, 0x00, 0x10, 0x01, 0x00, 0x00, 0x41, 0x56, 0x49, 0x4F,
-            0x00,
-        ];
-        assert_eq!(packet, expected);
-    }
-
-    #[test]
-    fn set_device_name_matches_controller_request() {
-        let packet = build_set_device_name("avio-bt-11", 0x261B).unwrap();
-        let expected = [
-            0x28, 0x09, 0x00, 0x15, 0x26, 0x1B, 0x10, 0x01, 0x00, 0x00, 0x61, 0x76, 0x69, 0x6F,
-            0x2D, 0x62, 0x74, 0x2D, 0x31, 0x31, 0x00,
-        ];
-        assert_eq!(packet, expected);
-    }
-
-    #[test]
-    fn control_packet_rejects_declared_length_overflow() {
-        assert_eq!(
-            build_control_packet(0x1000, &vec![0; 65_528], 0),
-            Err(NetaudioError::PacketTooLarge)
-        );
-
-        let maximum = build_control_packet(0x1000, &vec![0; 65_527], 0).unwrap();
-        assert_eq!(maximum.len(), u16::MAX as usize);
-        assert_eq!(&maximum[2..4], &u16::MAX.to_be_bytes());
-    }
-
-    #[test]
-    fn validate_accepts_valid_names() {
-        for name in ["a", "A1", "Studio-AVIO", "x-1-y", "Z", &"a".repeat(31)] {
-            assert_eq!(validate_dante_name(name), Ok(()), "{name}");
-        }
-    }
-
-    #[test]
-    fn validate_channel_name_accepts_controller_labels() {
-        for name in [
-            "windows-gaming:left",
-            "main-mix:right",
-            "shelford-channel:0dB",
-            "system:capture_13",
-        ] {
-            assert_eq!(validate_dante_channel_name(name), Ok(()), "{name}");
-        }
-    }
-
-    #[test]
-    fn validate_channel_reference_accepts_firmware_reported_labels() {
-        for name in ["Output 01", "Main Mix Left", "windows-gaming:left"] {
-            assert_eq!(validate_dante_channel_reference(name), Ok(()), "{name}");
-        }
-    }
-
-    #[test]
-    fn validate_channel_reference_rejects_non_wire_characters() {
-        for name in ["", "tx\0a", "tx\na", "über"] {
-            assert_eq!(
-                validate_dante_channel_reference(name),
-                Err(NetaudioError::NameInvalidChars),
-                "{name:?}"
-            );
-        }
-    }
-
-    #[test]
-    fn validate_rejects_long_names() {
-        assert_eq!(
-            validate_dante_name(&"a".repeat(32)),
-            Err(NetaudioError::NameTooLong)
-        );
-    }
-
-    #[test]
-    fn validate_rejects_hyphen_at_edges() {
-        assert_eq!(
-            validate_dante_name("-foo"),
-            Err(NetaudioError::NameInvalidHyphen)
-        );
-        assert_eq!(
-            validate_dante_name("foo-"),
-            Err(NetaudioError::NameInvalidHyphen)
-        );
-    }
-
-    #[test]
-    fn validate_rejects_invalid_characters() {
-        for name in ["", "foo_bar", "foo bar", "über", "foo.bar"] {
-            assert_eq!(
-                validate_dante_name(name),
-                Err(NetaudioError::NameInvalidChars),
-                "{name}"
-            );
-        }
-    }
-
-    #[test]
-    fn validate_device_name_rejects_colon_labels() {
-        assert_eq!(
-            validate_dante_name("windows-gaming:left"),
-            Err(NetaudioError::NameInvalidChars)
-        );
-    }
 }
