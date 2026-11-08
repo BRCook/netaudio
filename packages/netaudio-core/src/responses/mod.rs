@@ -348,11 +348,6 @@ pub struct TransmitterFlowStatus {
     pub subscriber_flow_name_pointer: u16,
     pub subscriber_flow_name: Option<String>,
     pub raw_record_hexadecimal: String,
-    /// Media mode decoded from the record's transport selector. Only exposed
-    /// for ARC 2.8.12 (0x280C), where native Dante (selector 1) is
-    /// capture-backed from a Behringer WING.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub media_mode: Option<&'static str>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
