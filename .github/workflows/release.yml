@@ -59,14 +59,25 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: astral-sh/setup-uv@v7
       - run: sudo apt-get update && sudo apt-get install --yes libasound2-dev libjack-jackd2-dev libpulse-dev pkg-config
+      # Keep the container build's downloaded crates and compiled output between
+      # releases; a new Cargo.lock starts a new cache but reuses the closest one.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            target
+            .cargo-home/registry
+            .cargo-home/git
+          key: manylinux-${{ matrix.architecture }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: manylinux-${{ matrix.architecture }}-
       - name: Build at the manylinux 2.28 compatibility floor
         shell: bash
         run: |
           docker run --pull always --rm \
             --volume "$PWD:/project" --workdir /project \
             "${{ matrix.manylinux-image }}" /bin/bash -euxo pipefail -c '
+              export CARGO_HOME=/project/.cargo-home
               curl --proto "=https" --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal
-              export PATH="$HOME/.cargo/bin:/opt/python/cp39-cp39/bin:$PATH"
+              export PATH="$CARGO_HOME/bin:/opt/python/cp39-cp39/bin:$PATH"
               python -m pip install --disable-pip-version-check uv auditwheel
               dnf install -y --setopt=skip_if_unavailable=True alsa-lib-devel jack-audio-connection-kit-devel pulseaudio-libs-devel pkgconf-pkg-config
               uv build --wheel

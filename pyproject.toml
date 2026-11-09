@@ -88,6 +88,23 @@ dev = [
     "tomli>=1.0.0",
 ]
 
+[tool.uv]
+# Rebuild netaudio whenever its sources change, not only when this file does:
+# the build compiles the Rust daemon and core and bundles the web UI into the
+# daemon, so without these keys uv can reinstall a stale cached build.
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "hatch_build_core.py" },
+    { file = "Cargo.toml" },
+    { file = "Cargo.lock" },
+    { file = "packages/*/Cargo.toml" },
+    { file = "packages/*/build.rs" },
+    { file = "packages/*/src/**/*.rs" },
+    { file = "packages/netaudio-daemon/assets/**/*" },
+    { file = "packages/netaudio/src/netaudio/**/*" },
+    { git = { commit = true } },
+]
+
 [tool.pytest.ini_options]
 addopts = ["--import-mode=importlib"]
 pythonpath = ["."]
