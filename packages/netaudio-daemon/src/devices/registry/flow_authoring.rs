@@ -13,7 +13,10 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::{Instant, timeout_at};
 
-const READBACK_WINDOW: Duration = Duration::from_secs(5);
+// Long enough for devices that take a moment to list a new flow (the Behringer
+// WING sometimes does when flows are created back to back).
+const READBACK_WINDOW: Duration = Duration::from_secs(10);
+const READBACK_RETRY_INTERVAL: Duration = Duration::from_millis(500);
 
 impl DeviceRegistry {
     pub async fn plan_transmit_flow(
@@ -351,10 +354,17 @@ impl DeviceRegistry {
                 Err(_) => break,
             }
 
+            if Instant::now() >= deadline {
+                break;
+            }
+            // Read back again on the next record change or after a short interval,
+            // whichever comes first, instead of waiting only for a change that may
+            // never arrive.
+            let wake = (Instant::now() + READBACK_RETRY_INTERVAL).min(deadline);
             tokio::select! {
                 _ = self.cancellation.cancelled() => break,
-                changed = timeout_at(deadline, changes.changed()) => {
-                    if !matches!(changed, Ok(Ok(()))) {
+                changed = timeout_at(wake, changes.changed()) => {
+                    if matches!(changed, Ok(Err(_))) {
                         break;
                     }
                 }

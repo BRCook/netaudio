@@ -1,4 +1,5 @@
-import { Button, Notice } from "../components.js";
+import { api } from "../api.js";
+import { AsyncButton, Button, Notice } from "../components.js";
 import * as format from "../format.js";
 import { t } from "../i18n.js";
 import { html, useEffect, useLayoutEffect, useState } from "../lib/preact.js";
@@ -11,6 +12,51 @@ import { contextDevices, contextExternalFlows, deviceRequestName, pendingSubscri
 import { inventoryFilters, saveRoutingFilters } from "../device-filters.js";
 
 export const routingLayout = { compactQuery: "(max-width: 900px)" };
+
+// Transmitter channel n goes to receiver channel n, for every number both have.
+export function patchPairs(transmitter, receiver) {
+  const sending = transmitter?.channels?.transmitters || {};
+  const receiving = receiver?.channels?.receivers || {};
+  return Object.keys(sending)
+    .map(Number)
+    .filter((number) => Number.isInteger(number) && receiving[number] !== undefined && sending[number]?.name)
+    .sort((first, second) => first - second)
+    .map((number) => ({ rx_channel: number, tx_channel: sending[number].name, tx_device: transmitter.name }));
+}
+
+function BulkPatch({ devices: available }) {
+  const online = available.filter((device) => device.online !== false && device.channels);
+  const transmitters = online.filter((device) => Object.keys(device.channels.transmitters || {}).length);
+  const receivers = online.filter((device) => Object.keys(device.channels.receivers || {}).length);
+  const [from, setFrom] = useState(transmitters[0]?.name || "");
+  const [to, setTo] = useState(receivers.find((device) => device.name !== from)?.name || "");
+  const transmitter = transmitters.find((device) => device.name === from);
+  const receiver = receivers.find((device) => device.name === to);
+  const pairs = transmitter && receiver && from !== to ? patchPairs(transmitter, receiver) : [];
+  return html`
+    <div class="toolbar">
+      <label>${t("From")}
+        <select value=${from} onChange=${(event) => setFrom(event.currentTarget.value)}>
+          ${transmitters.map((device) => html`<option key=${device.name} value=${device.name}>${device.name}</option>`)}
+        </select>
+      </label>
+      <label>${t("To")}
+        <select value=${to} onChange=${(event) => setTo(event.currentTarget.value)}>
+          <option value="">${t("Choose a receiver")}</option>
+          ${receivers.map((device) => html`<option key=${device.name} value=${device.name}>${device.name}</option>`)}
+        </select>
+      </label>
+      <${AsyncButton}
+        variant="primary"
+        small
+        disabled=${!pairs.length}
+        description=${t("patch {transmitter} to {receiver} one to one", { transmitter: from, receiver: to })}
+        onRun=${() => api.subscribe({ rx_device: deviceRequestName(receiver), subscriptions: pairs })}
+        >${t("Patch {count} channels", { count: pairs.length })}<//>
+      <small>${t("Each transmit channel goes to the receive channel with the same number.")}</small>
+    </div>
+  `;
+}
 
 function RoutingView() {
   const all = format.sortedDevices(contextDevices.value);
@@ -35,6 +81,7 @@ function RoutingView() {
     media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   }, []);
+  const [bulkPatch, setBulkPatch] = useState(false);
   const state = expanded.value;
   const groups = channelGroups.value;
   const pending = pendingSubscriptions.value;
@@ -74,6 +121,7 @@ function RoutingView() {
       <div class="content-header">
         <div class="toolbar">
           ${!compact ? html`<${Button} onClick=${() => updateFilters({ ...filters, listMode: !listMode })}>${listMode ? t("Show grid") : t("Channel list")}<//>` : null}
+          <button class="btn btn-sm" type="button" aria-pressed=${bulkPatch} onClick=${() => setBulkPatch(!bulkPatch)}>${t("Patch 1:1")}</button>
           ${!showList ? html`
           <button class="btn btn-sm" type="button" aria-pressed=${gridLocked}
             onClick=${() => {
@@ -90,6 +138,7 @@ function RoutingView() {
           <button class="btn btn-sm" type="button" aria-pressed=${groups.enabled} onClick=${() => enableChannelGroups(!groups.enabled)}><${Icon} name="groups" /> ${t("Channel groups")}</button>
           ` : null}
         </div>
+        ${bulkPatch ? html`<${BulkPatch} devices=${all} />` : null}
       </div>
       <div class="routing-workspace">
         <div class="routing-results">

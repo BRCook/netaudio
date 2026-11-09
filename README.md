@@ -21,6 +21,7 @@ NetAudio discovers, routes, configures and monitors Dante network audio devices 
 | Switch PTPv2 delay requests between multicast and unicast | Web UI and API |
 | Show and change multicast and unicast flow performance (latency, frames per packet) | Web UI |
 | Create several multicast flows at once (`flow create-batch`, Channels per flow) | CLI and web UI |
+| Patch one device to another 1:1 in one step (Routing → Patch 1:1) | Web UI |
 | Remove the iOS and iPadOS app packaging | Repository |
 
 The flow changes apply only to devices advertising protocol 0x280C, and the PTPv2 setting is only offered where the device's clock status reports support for it. Other devices behave as they do upstream.
