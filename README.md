@@ -20,6 +20,7 @@ NetAudio discovers, routes, configures and monitors Dante network audio devices 
 | Change Dante redundancy (Switched, Redundant, Separated) on devices that offer it as a list of modes, such as the WING | CLI and web UI |
 | Switch PTPv2 delay requests between multicast and unicast | Web UI and API |
 | Show and change multicast and unicast flow performance (latency, frames per packet) | Web UI |
+| Create several multicast flows at once (`flow create-batch`) | CLI |
 | Remove the iOS and iPadOS app packaging | Repository |
 
 The flow changes apply only to devices advertising protocol 0x280C, and the PTPv2 setting is only offered where the device's clock status reports support for it. Other devices behave as they do upstream.
@@ -88,6 +89,14 @@ netaudio -n console flow delete --slot 32 --yes
 ```
 
 The web interface offers the same in the device's transmit flows section, where the new-flow form asks for a media-local flow identifier on these devices.
+
+To create several flows at once, `flow create-batch` splits a channel range into flows of a given size. This creates five flows on `console` (channels 1–14, 15–28, 29–42, 43–56 and 57–64), numbered downwards from 32 as Dante Controller does:
+
+```bash
+netaudio -n console flow create-batch --channels 1-64 --per-flow 14 --yes
+```
+
+Add `--print` to see the flow specifications without creating anything. Flows are created one at a time and checked by readback; the command stops at the first flow that isn't confirmed.
 
 ### PTPv2 without AES67
 

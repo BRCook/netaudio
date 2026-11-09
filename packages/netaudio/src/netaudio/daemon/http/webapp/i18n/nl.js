@@ -96,7 +96,6 @@ export default {
   "{setting} frames per packet": "{setting}: frames per pakket",
   "{count} frames": "{count} frames",
   "apply {setting} performance on {device}": "{setting}-prestaties toepassen op {device}",
-  "WING consoles don't create multicast flows at 64 frames per packet, and keep transmit latency at 5 ms or more.": "WING-consoles maken geen multicastflows met 64 frames per pakket en houden de zendlatentie op 5 ms of meer.",
   "Bit depth": "Bitdiepte",
   "Receivers ({count})": "Ontvangers ({count})",
   "unsubscribe all receivers on {device}": "Abonnementen van alle ontvangers op {device} opheffen",

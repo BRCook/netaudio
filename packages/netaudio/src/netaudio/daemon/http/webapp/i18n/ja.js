@@ -96,7 +96,6 @@ export default {
   "{setting} frames per packet": "{setting}のパケットあたりフレーム数",
   "{count} frames": "{count}フレーム",
   "apply {setting} performance on {device}": "{device}に{setting}のパフォーマンスを適用",
-  "WING consoles don't create multicast flows at 64 frames per packet, and keep transmit latency at 5 ms or more.": "WINGコンソールは64フレーム/パケットではマルチキャストフローを作成せず、送信レイテンシーを5 ms以上に保ちます。",
   "Bit depth": "ビット深度",
   "Receivers ({count})": "受信機（{count}）",
   "unsubscribe all receivers on {device}": "{device}のすべての受信サブスクリプションを解除",

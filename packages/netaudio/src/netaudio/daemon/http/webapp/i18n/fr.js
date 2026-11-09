@@ -96,7 +96,6 @@ export default {
   "{setting} frames per packet": "{setting} : trames par paquet",
   "{count} frames": "{count} trames",
   "apply {setting} performance on {device}": "appliquer les performances {setting} sur {device}",
-  "WING consoles don't create multicast flows at 64 frames per packet, and keep transmit latency at 5 ms or more.": "Les consoles WING ne créent pas de flux multicast à 64 trames par paquet et maintiennent la latence d'émission à 5 ms ou plus.",
   "Bit depth": "Profondeur de bits",
   "Receivers ({count})": "Récepteurs ({count})",
   "unsubscribe all receivers on {device}": "désabonner tous les récepteurs de {device}",

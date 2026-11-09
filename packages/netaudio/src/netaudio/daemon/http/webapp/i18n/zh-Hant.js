@@ -96,7 +96,6 @@ export default {
   "{setting} frames per packet": "{setting}每封包影格數",
   "{count} frames": "{count} 影格",
   "apply {setting} performance on {device}": "在 {device} 上套用{setting}效能",
-  "WING consoles don't create multicast flows at 64 frames per packet, and keep transmit latency at 5 ms or more.": "WING 混音台在每封包 64 影格時不會建立多播串流，並將傳送延遲保持在 5 ms 以上。",
   "Bit depth": "位元深度",
   "Receivers ({count})": "接收裝置（{count}）",
   "unsubscribe all receivers on {device}": "取消 {device} 上所有接收通道的訂閱",

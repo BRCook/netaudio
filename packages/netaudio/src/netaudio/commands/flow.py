@@ -199,6 +199,115 @@ def flow_apply(
     run_command(run_flow_apply, _read_specification(specification_file))
 
 
+def _parse_channel_ranges(text: str) -> list[int]:
+    """Expand "1-64" or "1-8,17,20-24" into transmitter channel numbers."""
+    channels: list[int] = []
+    for part in text.split(","):
+        bounds = [bound.strip() for bound in part.split("-")]
+        if len(bounds) > 2 or any(not bound.isdigit() for bound in bounds):
+            raise ValueError(f"invalid channel range {part.strip()!r}")
+        first, last = int(bounds[0]), int(bounds[-1])
+        if first < 1 or last < first:
+            raise ValueError(f"invalid channel range {part.strip()!r}")
+        channels.extend(range(first, last + 1))
+    if len(set(channels)) != len(channels):
+        raise ValueError("channel ranges overlap")
+    return channels
+
+
+def _batch_identity_field(device, identity: str | None) -> str:
+    if identity is not None:
+        return {"media-local": "media_local_flow_id", "global": "global_flow_id"}[identity]
+    authoring = getattr(device, "transmit_flow_authoring", None) or {}
+    return authoring.get("identity_field") or "media_local_flow_id"
+
+
+def _batch_specifications(device, channels, per_flow, first_id, ascending, media_mode, identity):
+    groups = [channels[index : index + per_flow] for index in range(0, len(channels), per_flow)]
+    step = 1 if ascending else -1
+    identifiers = [first_id + step * index for index in range(len(groups))]
+    if min(identifiers) < 1 or max(identifiers) > 65535:
+        raise ValueError(f"{len(groups)} flows from identifier {first_id} run outside 1-65535")
+    identity_field = _batch_identity_field(device, identity)
+    return [
+        (
+            identifier,
+            group,
+            {
+                "schema_version": 1,
+                "media_mode": media_mode,
+                "flow_type": "multicast",
+                "identity": {identity_field: identifier},
+                "channel_slots": [
+                    {"slot": slot, "transmitter_channel": channel} for slot, channel in enumerate(group, start=1)
+                ],
+            },
+        )
+        for identifier, group in zip(identifiers, groups)
+    ]
+
+
+async def run_flow_create_batch(application, devices, options: dict) -> None:
+    device, _ = _selected_device(devices)
+    try:
+        batch = _batch_specifications(device, **options["layout"])
+    except ValueError as exception:
+        _fail_validation(flows.FlowValidationError(str(exception)))
+    if options["print_only"]:
+        output_single([specification for _, _, specification in batch])
+        return
+    operation = getattr(application, "create_transmit_flow", None)
+    for identifier, group, value in batch:
+        if not structured_output_selected():
+            typer.echo(f"== flow {identifier}: transmitter channels {group[0]}-{group[-1]} ({len(group)} channels)")
+        try:
+            specification = parse_transmit_flow_specification(value)
+        except ValueError as exception:
+            _fail_validation(flows.FlowValidationError(f"invalid transmit-flow specification: {exception}"))
+        result = (
+            await operation(device, specification)
+            if operation is not None
+            else await create_transmit_flow(device, specification)
+        )
+        # Stops at the first flow that isn't confirmed; earlier flows stay created.
+        _require_successful_result(result)
+
+
+@app.command("create-batch")
+def flow_create_batch(
+    channels: str = typer.Option(..., "--channels", help="Transmitter channels, such as 1-64 or 1-8,17-24."),
+    per_flow: int = typer.Option(..., "--per-flow", min=1, max=64, help="Channels in each flow."),
+    first_id: int = typer.Option(32, "--first-id", min=1, max=65535, help="Identifier of the first flow."),
+    ascending: bool = typer.Option(
+        False, "--ascending", help="Number flows upwards from --first-id (default: downwards, like Dante Controller)."
+    ),
+    media_mode: str = typer.Option("native_dante", "--media-mode", help="native_dante or rtp_aes67."),
+    identity: str | None = typer.Option(
+        None, "--identity", help="media-local or global flow identifiers (default: what the device uses)."
+    ),
+    print_only: bool = typer.Option(False, "--print", help="Print the flow specifications without creating them."),
+    confirmed: bool = typer.Option(False, "--yes", "-y", help="Confirm transmit-flow creation."),
+):
+    """Create several multicast flows at once, splitting the channels into groups of --per-flow."""
+    if identity not in (None, "media-local", "global"):
+        _fail_validation(flows.FlowValidationError("--identity must be media-local or global"))
+    if not confirmed and not print_only:
+        _fail_validation(flows.FlowValidationError("--yes is required"))
+    try:
+        channel_numbers = _parse_channel_ranges(channels)
+    except ValueError as exception:
+        _fail_validation(flows.FlowValidationError(str(exception)))
+    layout = {
+        "channels": channel_numbers,
+        "per_flow": per_flow,
+        "first_id": first_id,
+        "ascending": ascending,
+        "media_mode": media_mode,
+        "identity": identity,
+    }
+    run_command(run_flow_create_batch, {"layout": layout, "print_only": print_only})
+
+
 async def run_receiver_flow_list(application, devices) -> None:
     device, _arc_port = _selected_device(devices)
     flow_inventory = await flows.query_preferred_receiver_flow_inventory(device)

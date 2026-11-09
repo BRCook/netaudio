@@ -96,7 +96,6 @@ export default {
   "{setting} frames per packet": "{setting} பாக்கெட்டுக்கான ஃப்ரேம்கள்",
   "{count} frames": "{count} ஃப்ரேம்கள்",
   "apply {setting} performance on {device}": "{device} இல் {setting} செயல்திறனைப் பயன்படுத்து",
-  "WING consoles don't create multicast flows at 64 frames per packet, and keep transmit latency at 5 ms or more.": "WING கன்சோல்கள் பாக்கெட்டுக்கு 64 ஃப்ரேம்களில் மல்டிகாஸ்ட் ஓட்டங்களை உருவாக்குவதில்லை; அனுப்பும் தாமதத்தை 5 ms அல்லது அதற்கு மேல் வைத்திருக்கும்.",
   "Bit depth": "பிட் ஆழம்",
   "Receivers ({count})": "பெறுநர்கள் ({count})",
   "unsubscribe all receivers on {device}": "{device}-இல் அனைத்துப் பெறுநர்களின் சந்தாக்களையும் நீக்கு",

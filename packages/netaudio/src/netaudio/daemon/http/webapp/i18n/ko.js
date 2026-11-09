@@ -96,7 +96,6 @@ export default {
   "{setting} frames per packet": "{setting} 패킷당 프레임",
   "{count} frames": "{count}프레임",
   "apply {setting} performance on {device}": "{device}에 {setting} 성능 적용",
-  "WING consoles don't create multicast flows at 64 frames per packet, and keep transmit latency at 5 ms or more.": "WING 콘솔은 패킷당 64프레임에서는 멀티캐스트 플로를 만들지 않으며 송신 지연 시간을 5 ms 이상으로 유지합니다.",
   "Bit depth": "비트 심도",
   "Receivers ({count})": "수신기({count})",
   "unsubscribe all receivers on {device}": "{device}의 모든 수신 구독 취소",

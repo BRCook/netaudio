@@ -96,7 +96,6 @@ export default {
   "{setting} frames per packet": "Bingkai setiap paket {setting}",
   "{count} frames": "{count} bingkai",
   "apply {setting} performance on {device}": "gunakan prestasi {setting} pada {device}",
-  "WING consoles don't create multicast flows at 64 frames per packet, and keep transmit latency at 5 ms or more.": "Konsol WING tidak mencipta aliran multicast pada 64 bingkai setiap paket dan mengekalkan kependaman hantaran pada 5 ms atau lebih.",
   "Bit depth": "Kedalaman bit",
   "Receivers ({count})": "Penerima ({count})",
   "unsubscribe all receivers on {device}": "nyahlanggan semua penerima pada {device}",
