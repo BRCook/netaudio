@@ -158,9 +158,51 @@ impl FlowInventory {
         {
             let page = parse_transmitter_flow_status_page(response)
                 .ok_or("malformed transmitter flow status page")?;
-            self.complete = Some(json!(page));
+            if self
+                .capacity
+                .is_some_and(|capacity| capacity != page.maximum_flow_slots)
+            {
+                return Err("flow page capacity changed during pagination");
+            }
+            if page
+                .flows
+                .iter()
+                .any(|flow| self.identifiers.contains(&flow.global_flow_id))
+            {
+                return Err("flow page has an invalid or repeated flow identifier");
+            }
+            // Continuation requests name the 1-based index of the next record.
+            let next = match envelope.result_code {
+                RESULT_CODE_SUCCESS => None,
+                RESULT_CODE_MORE_PAGES => {
+                    if page.flows.is_empty() {
+                        return Err("flow page made no progress");
+                    }
+                    let received = self.records.len() + page.flows.len();
+                    Some(u16::try_from(received + 1).map_err(|_| "flow identifier overflow")?)
+                }
+                _ => unreachable!("result code checked before parsing"),
+            };
+
+            self.capacity = Some(page.maximum_flow_slots);
+            self.observed_opcode = Some(envelope.opcode);
+            self.observed_protocol_id = Some(envelope.protocol_id);
+            for flow in &page.flows {
+                self.identifiers.insert(flow.global_flow_id);
+                self.records.push(json!(flow));
+            }
+            self.raw_pages.push(response.to_vec());
             self.pages += 1;
 
+            match next {
+                Some(next) => self.starting_flow = next,
+                None => {
+                    let mut inventory = json!(page);
+                    inventory["reported_flow_count"] = json!(self.records.len());
+                    inventory["flows"] = json!(self.records);
+                    self.complete = Some(inventory);
+                }
+            }
             return Ok(());
         }
 

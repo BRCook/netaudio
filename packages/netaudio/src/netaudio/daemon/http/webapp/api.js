@@ -171,6 +171,10 @@ export const api = {
       name,
     }),
   setLatency: (device, latency) => post("/set-latency", { device, latency }),
+  setTransmitFlowPerformance: (device, latency_microseconds, frames_per_packet) =>
+    post("/set-transmit-flow-performance", { device, latency_microseconds, frames_per_packet }),
+  setUnicastPerformance: (device, latency_microseconds, frames_per_packet) =>
+    post("/set-unicast-performance", { device, latency_microseconds, frames_per_packet }),
   lock: (device, pin) => post("/lock", { device, pin }),
   unlock: (device, pin) => post("/unlock", { device, pin }),
   refresh: (device) => post("/refresh", device ? { device } : {}),

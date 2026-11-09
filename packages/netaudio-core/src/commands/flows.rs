@@ -200,8 +200,18 @@ pub fn build_query_tx_flows_from(
                 message_id,
             )
         }
+        // Continuation pages, as Dante Controller requests them: mode 3 with the
+        // 1-based index of the first record wanted (13 after a 12-record page).
         flow_protocol_id if crate::protocol::is_modern_arc_protocol(flow_protocol_id) => {
-            Err(NetaudioError::InvalidFlowSlot)
+            let mut body = [0u8; 24];
+            body[6..10].copy_from_slice(&[0x00, 0x01, 0x00, 0x03]);
+            body[10..12].copy_from_slice(&starting_flow.to_be_bytes());
+            arc_packet_with_reserved_word(
+                flow_protocol_id,
+                OPCODE_QUERY_TX_FLOWS_2809,
+                &body,
+                message_id,
+            )
         }
         _ => Err(NetaudioError::InvalidFlowProtocol),
     }

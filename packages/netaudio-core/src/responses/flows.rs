@@ -163,7 +163,9 @@ pub fn parse_transmitter_flow_status_page(response: &[u8]) -> Option<Transmitter
     let envelope = validate_response_envelope(
         response,
         &modern_arc_protocol_opcodes(OPCODE_QUERY_TX_FLOWS_2809),
-        &[RESULT_CODE_SUCCESS],
+        // Devices page long flow lists (a Behringer WING sends 12 per page) and
+        // mark every page but the last with "more pages".
+        &[RESULT_CODE_SUCCESS, crate::protocol::RESULT_CODE_MORE_PAGES],
     )?;
     let body = envelope.body;
     if body.len() < 12 {
