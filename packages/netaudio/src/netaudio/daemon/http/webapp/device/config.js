@@ -458,6 +458,10 @@ const PERFORMANCE_SETTINGS = [
     label: "Multicast flows",
     latencyProperty: "33284",
     framesProperty: "528",
+    // Devices report the frames-per-packet range for transmit flows as inline
+    // settings: 0x0213 is the minimum and 0x0212 the maximum.
+    framesMinimumProperty: "0x0213",
+    framesMaximumProperty: "0x0212",
     apply: (device, latency, frames) => api.setTransmitFlowPerformance(device, latency, frames),
   },
   {
@@ -495,8 +499,13 @@ function PerformanceSetting({ device, requestName, setting }) {
     ...(device.standard_latency_choices_ms || []).map(Number),
     ...(currentLatency === null ? [] : [currentLatency]),
   ])].sort((first, second) => first - second);
+  const inline = device.settings_inline_values || {};
+  const framesMinimum = Number.isInteger(inline[setting.framesMinimumProperty]) ? inline[setting.framesMinimumProperty] : null;
+  const framesMaximum = Number.isInteger(inline[setting.framesMaximumProperty]) ? inline[setting.framesMaximumProperty] : null;
+  const withinRange = (value) =>
+    (framesMinimum === null || value >= framesMinimum) && (framesMaximum === null || value <= framesMaximum);
   const frameChoices = [...new Set([
-    ...PERFORMANCE_FRAMES_PER_PACKET,
+    ...PERFORMANCE_FRAMES_PER_PACKET.filter(withinRange),
     ...(currentFrames === null ? [] : [currentFrames]),
   ])].sort((first, second) => first - second);
   const label = (value, current, text) => (value === current ? t("{value} (current)", { value: text }) : text);
@@ -529,6 +538,9 @@ function PerformanceSetting({ device, requestName, setting }) {
         onRun=${apply}
         >${t("Apply")}<//>
     <//>
+    ${framesMinimum !== null && framesMaximum !== null
+      ? html`<p class="text-sm opacity-70">${t("This device accepts {minimum} to {maximum} frames per packet.", { minimum: framesMinimum, maximum: framesMaximum })}</p>`
+      : null}
   `;
 }
 

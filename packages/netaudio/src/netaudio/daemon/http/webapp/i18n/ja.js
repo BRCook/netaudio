@@ -90,6 +90,7 @@ export default {
   "Sample rate": "サンプルレート",
   "Encoding": "エンコーディング",
   "Flow performance": "フローのパフォーマンス",
+  "This device accepts {minimum} to {maximum} frames per packet.": "このデバイスはパケットあたり{minimum}～{maximum}フレームに対応しています。",
   "New flows use these settings; existing flows keep theirs until they are re-created or re-subscribed.": "新しいフローにはこの設定が使われます。既存のフローは再作成または再サブスクライブされるまで現在の設定のままです。",
   "Choose a latency and frames per packet.": "レイテンシーとパケットあたりのフレーム数を選択してください。",
   "{setting} latency": "{setting}のレイテンシー",

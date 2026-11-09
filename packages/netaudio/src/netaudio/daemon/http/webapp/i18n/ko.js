@@ -90,6 +90,7 @@ export default {
   "Sample rate": "샘플 레이트",
   "Encoding": "인코딩",
   "Flow performance": "플로 성능",
+  "This device accepts {minimum} to {maximum} frames per packet.": "이 장치는 패킷당 {minimum}~{maximum}프레임을 지원합니다.",
   "New flows use these settings; existing flows keep theirs until they are re-created or re-subscribed.": "새 플로는 이 설정을 사용하며, 기존 플로는 다시 만들거나 다시 구독할 때까지 기존 설정을 유지합니다.",
   "Choose a latency and frames per packet.": "지연 시간과 패킷당 프레임 수를 선택하세요.",
   "{setting} latency": "{setting} 지연 시간",

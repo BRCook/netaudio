@@ -90,6 +90,7 @@ export default {
   "Sample rate": "Kadar sampel",
   "Encoding": "Pengekodan",
   "Flow performance": "Prestasi aliran",
+  "This device accepts {minimum} to {maximum} frames per packet.": "Peranti ini menerima {minimum} hingga {maximum} bingkai setiap paket.",
   "New flows use these settings; existing flows keep theirs until they are re-created or re-subscribed.": "Aliran baharu menggunakan tetapan ini; aliran sedia ada mengekalkan tetapannya sehingga dicipta semula atau dilanggan semula.",
   "Choose a latency and frames per packet.": "Pilih kependaman dan bingkai setiap paket.",
   "{setting} latency": "Kependaman {setting}",

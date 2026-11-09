@@ -90,6 +90,7 @@ export default {
   "Sample rate": "மாதிரி வீதம்",
   "Encoding": "குறியாக்கம்",
   "Flow performance": "ஓட்ட செயல்திறன்",
+  "This device accepts {minimum} to {maximum} frames per packet.": "இந்தச் சாதனம் ஒரு பாக்கெட்டுக்கு {minimum} முதல் {maximum} ஃப்ரேம்களை ஏற்கும்.",
   "New flows use these settings; existing flows keep theirs until they are re-created or re-subscribed.": "புதிய ஓட்டங்கள் இந்த அமைப்புகளைப் பயன்படுத்தும்; ஏற்கனவே உள்ளவை மீண்டும் உருவாக்கப்படும் அல்லது மீண்டும் சந்தா செய்யப்படும் வரை தங்கள் அமைப்புகளை வைத்திருக்கும்.",
   "Choose a latency and frames per packet.": "தாமதத்தையும் ஒரு பாக்கெட்டுக்கான ஃப்ரேம்களையும் தேர்ந்தெடுக்கவும்.",
   "{setting} latency": "{setting} தாமதம்",

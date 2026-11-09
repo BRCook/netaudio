@@ -90,6 +90,7 @@ export default {
   "Sample rate": "Abtastrate",
   "Encoding": "Kodierung",
   "Flow performance": "Flow-Leistung",
+  "This device accepts {minimum} to {maximum} frames per packet.": "Dieses Gerät akzeptiert {minimum} bis {maximum} Frames pro Paket.",
   "New flows use these settings; existing flows keep theirs until they are re-created or re-subscribed.": "Neue Flows verwenden diese Einstellungen; bestehende Flows behalten ihre, bis sie neu erstellt oder neu abonniert werden.",
   "Choose a latency and frames per packet.": "Wähle eine Latenz und Frames pro Paket.",
   "{setting} latency": "{setting}: Latenz",

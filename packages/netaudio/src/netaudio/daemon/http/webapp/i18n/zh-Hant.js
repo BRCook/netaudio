@@ -90,6 +90,7 @@ export default {
   "Sample rate": "採樣率",
   "Encoding": "編碼",
   "Flow performance": "串流效能",
+  "This device accepts {minimum} to {maximum} frames per packet.": "此裝置支援每封包 {minimum} 到 {maximum} 影格。",
   "New flows use these settings; existing flows keep theirs until they are re-created or re-subscribed.": "新串流會使用這些設定；現有串流在重新建立或重新訂閱前會保留原設定。",
   "Choose a latency and frames per packet.": "請選擇延遲與每封包影格數。",
   "{setting} latency": "{setting}延遲",

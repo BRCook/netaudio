@@ -361,7 +361,9 @@ pub fn create_preflight(request: FlowCreatePreflightRequest) -> FlowCreatePrefli
     };
     let requested = request.requested_flow_id.map(NonZeroU16::get);
     let reason = if inventory.flows.len() >= usize::from(capacity) {
-        Some("all transmitter flow slots are in use".into())
+        Some(format!(
+            "all {capacity} transmitter flow slots are in use; unicast subscriptions to this device use them too"
+        ))
     } else if let Some(id) = requested.filter(|id| *id > capacity) {
         Some(format!(
             "flow {id} exceeds the device capacity of {capacity}"

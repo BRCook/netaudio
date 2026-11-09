@@ -210,7 +210,7 @@ pub fn parse_device_settings(response: &[u8]) -> Option<DeviceSettings> {
             continue;
         }
         if info_code & 0x8000 == 0 {
-            if matches!(info_code, 0x0210 | 0x0211 | 0x0213 | 0x0214 | 0x0310)
+            if matches!(info_code, 0x0210..=0x0214 | 0x0310)
                 || crate::commands::PERFORMANCE_PROPERTY_IDS.contains(&info_code)
                 || info_code == DEVICE_SETTINGS_INFO_AES67_CONFIGURED
             {

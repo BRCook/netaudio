@@ -90,6 +90,7 @@ export default {
   "Sample rate": "Taxa de amostragem",
   "Encoding": "Codificação",
   "Flow performance": "Desempenho dos fluxos",
+  "This device accepts {minimum} to {maximum} frames per packet.": "Este dispositivo aceita de {minimum} a {maximum} quadros por pacote.",
   "New flows use these settings; existing flows keep theirs until they are re-created or re-subscribed.": "Novos fluxos usam estas configurações; os existentes mantêm as suas até serem recriados ou reinscritos.",
   "Choose a latency and frames per packet.": "Escolha uma latência e os quadros por pacote.",
   "{setting} latency": "{setting}: latência",

@@ -90,6 +90,7 @@ export default {
   "Sample rate": "Samplefrequentie",
   "Encoding": "Codering",
   "Flow performance": "Flowprestaties",
+  "This device accepts {minimum} to {maximum} frames per packet.": "Dit apparaat accepteert {minimum} tot {maximum} frames per pakket.",
   "New flows use these settings; existing flows keep theirs until they are re-created or re-subscribed.": "Nieuwe flows gebruiken deze instellingen; bestaande flows houden de hunne tot ze opnieuw worden gemaakt of geabonneerd.",
   "Choose a latency and frames per packet.": "Kies een latentie en het aantal frames per pakket.",
   "{setting} latency": "{setting}: latentie",

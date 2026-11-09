@@ -401,6 +401,18 @@ impl DeviceRecord {
                 performance.insert(property.property_id.to_string(), json!(property.value));
             }
         }
+
+        // Every inline setting the device reported, keyed by property id, so
+        // undecoded ones (such as possible frames-per-packet limits) can be read.
+        if !settings.inline_values.is_empty() {
+            let values: serde_json::Map<String, Value> = settings
+                .inline_values
+                .iter()
+                .map(|value| (format!("0x{:04x}", value.info_code), json!(value.value)))
+                .collect();
+            self.properties
+                .insert("settings_inline_values".to_owned(), Value::Object(values));
+        }
         Ok(())
     }
 

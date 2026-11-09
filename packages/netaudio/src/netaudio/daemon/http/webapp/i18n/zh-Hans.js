@@ -90,6 +90,7 @@ export default {
   "Sample rate": "采样率",
   "Encoding": "编码",
   "Flow performance": "流性能",
+  "This device accepts {minimum} to {maximum} frames per packet.": "此设备支持每包 {minimum} 到 {maximum} 帧。",
   "New flows use these settings; existing flows keep theirs until they are re-created or re-subscribed.": "新流会使用这些设置；现有流在重新创建或重新订阅之前保持原有设置。",
   "Choose a latency and frames per packet.": "请选择延迟和每包帧数。",
   "{setting} latency": "{setting}延迟",
