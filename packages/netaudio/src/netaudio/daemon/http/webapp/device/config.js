@@ -448,8 +448,6 @@ export function DeviceConfigSection({ device }) {
   `;
 }
 
-const PERFORMANCE_FRAMES_PER_PACKET = [2, 4, 6, 8, 12, 16, 24, 32, 48, 64];
-
 // Each setting is a latency and frames per packet pair, stored on the device as
 // properties: transmit flows 0x8204 (ns) / 0x0210, unicast flows 0x8205 / 0x0211.
 const PERFORMANCE_SETTINGS = [
@@ -495,42 +493,49 @@ function PerformanceSetting({ device, requestName, setting }) {
   const stored = device.performance_settings || {};
   const currentLatency = Number.isFinite(stored[setting.latencyProperty]) ? stored[setting.latencyProperty] / 1000000 : null;
   const currentFrames = Number.isFinite(stored[setting.framesProperty]) ? stored[setting.framesProperty] : null;
-  const latencies = [...new Set([
-    ...(device.standard_latency_choices_ms || []).map(Number),
-    ...(currentLatency === null ? [] : [currentLatency]),
-  ])].sort((first, second) => first - second);
+  const latencyMinimum = Number.isFinite(device.min_latency_ms) ? device.min_latency_ms : null;
+  const latencyMaximum = Number.isFinite(device.max_latency_ms) ? device.max_latency_ms : null;
   const inline = device.settings_inline_values || {};
   const framesMinimum = Number.isInteger(inline[setting.framesMinimumProperty]) ? inline[setting.framesMinimumProperty] : null;
   const framesMaximum = Number.isInteger(inline[setting.framesMaximumProperty]) ? inline[setting.framesMaximumProperty] : null;
-  const withinRange = (value) =>
-    (framesMinimum === null || value >= framesMinimum) && (framesMaximum === null || value <= framesMaximum);
-  const frameChoices = [...new Set([
-    ...PERFORMANCE_FRAMES_PER_PACKET.filter(withinRange),
-    ...(currentFrames === null ? [] : [currentFrames]),
-  ])].sort((first, second) => first - second);
-  const label = (value, current, text) => (value === current ? t("{value} (current)", { value: text }) : text);
   const apply = () => {
     const latencyMilliseconds = Number(latency.current?.value);
     const framesPerPacket = Number(frames.current?.value);
-    if (!Number.isFinite(latencyMilliseconds) || !Number.isInteger(framesPerPacket)) {
-      throw new Error(t("Choose a latency and frames per packet."));
+    if (!Number.isFinite(latencyMilliseconds) || latencyMilliseconds <= 0 || !Number.isInteger(framesPerPacket) || framesPerPacket < 1) {
+      throw new Error(t("Enter a latency in milliseconds and a whole number of frames per packet."));
+    }
+    if ((latencyMinimum !== null && latencyMilliseconds < latencyMinimum) || (latencyMaximum !== null && latencyMilliseconds > latencyMaximum)) {
+      throw new Error(t("Latency must be between {minimum} and {maximum} ms.", { minimum: latencyMinimum, maximum: Math.round(latencyMaximum * 100) / 100 }));
+    }
+    if ((framesMinimum !== null && framesPerPacket < framesMinimum) || (framesMaximum !== null && framesPerPacket > framesMaximum)) {
+      throw new Error(t("This device accepts {minimum} to {maximum} frames per packet.", { minimum: framesMinimum, maximum: framesMaximum }));
     }
     return setting.apply(requestName, Math.round(latencyMilliseconds * 1000), framesPerPacket);
   };
+  // Free entry; the fields start at the device's current values and keep what
+  // is typed while the page refreshes, since defaultValue only applies once.
   return html`
     <${FieldRow} label=${t(setting.label)}>
-      <select ref=${latency} aria-label=${t("{setting} latency", { setting: t(setting.label) })}>
-        ${currentLatency === null ? html`<option value="">${t("Latency")}</option>` : null}
-        ${latencies.map((value) => html`<option key=${value} value=${value} selected=${value === currentLatency}>
-          ${label(value, currentLatency, `${value} ms`)}
-        </option>`)}
-      </select>
-      <select ref=${frames} aria-label=${t("{setting} frames per packet", { setting: t(setting.label) })}>
-        ${currentFrames === null ? html`<option value="">${t("Frames per packet")}</option>` : null}
-        ${frameChoices.map((value) => html`<option key=${value} value=${value} selected=${value === currentFrames}>
-          ${label(value, currentFrames, t("{count} frames", { count: value }))}
-        </option>`)}
-      </select>
+      <input
+        ref=${latency}
+        type="number"
+        step="0.01"
+        min=${latencyMinimum ?? 0.01}
+        max=${latencyMaximum ?? undefined}
+        defaultValue=${currentLatency ?? ""}
+        aria-label=${t("{setting} latency", { setting: t(setting.label) })}
+      />
+      <span>${t("ms")}</span>
+      <input
+        ref=${frames}
+        type="number"
+        step="1"
+        min=${framesMinimum ?? 1}
+        max=${framesMaximum ?? undefined}
+        defaultValue=${currentFrames ?? ""}
+        aria-label=${t("{setting} frames per packet", { setting: t(setting.label) })}
+      />
+      <span>${t("frames per packet")}</span>
       <${AsyncButton}
         variant="primary"
         small
@@ -538,9 +543,14 @@ function PerformanceSetting({ device, requestName, setting }) {
         onRun=${apply}
         >${t("Apply")}<//>
     <//>
-    ${framesMinimum !== null && framesMaximum !== null
-      ? html`<p class="text-sm opacity-70">${t("This device accepts {minimum} to {maximum} frames per packet.", { minimum: framesMinimum, maximum: framesMaximum })}</p>`
-      : null}
+    <p class="text-sm opacity-70">
+      ${currentLatency !== null && currentFrames !== null
+        ? t("Current: {latency} ms, {frames} frames per packet.", { latency: currentLatency, frames: currentFrames })
+        : null}
+      ${framesMinimum !== null && framesMaximum !== null
+        ? ` ${t("This device accepts {minimum} to {maximum} frames per packet.", { minimum: framesMinimum, maximum: framesMaximum })}`
+        : null}
+    </p>
   `;
 }
 
