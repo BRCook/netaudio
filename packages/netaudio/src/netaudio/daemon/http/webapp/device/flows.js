@@ -300,6 +300,37 @@ function FlowRow({ entry, onDelete, requestName }) {
   </tr>`;
 }
 
+// Splits the channels into groups of perFlow, numbered downwards from flowId.
+// Returns null when no split applies (no size given, or one flow suffices).
+export function batchLayout(channels, perFlow, flowId) {
+  if (String(perFlow).trim() === "") return null;
+  const size = Number(perFlow);
+  if (!Number.isInteger(size) || size < 1) throw new Error(t("Enter a whole number of channels per flow."));
+  const numbers = parseChannels(channels);
+  if (numbers.length <= size) return null;
+  const groups = [];
+  for (let index = 0; index < numbers.length; index += size) groups.push(numbers.slice(index, index + size));
+  const first = Number(flowId);
+  if (!Number.isInteger(first) || first - (groups.length - 1) < 1) {
+    throw new Error(t("Not enough flow identifiers below {first} for {count} flows.", { first: flowId, count: groups.length }));
+  }
+  return { groups, identifiers: groups.map((_, index) => first - index) };
+}
+
+function batchSummary(channels, perFlow, flowId) {
+  try {
+    const layout = batchLayout(channels, perFlow, flowId);
+    if (!layout) return null;
+    return html`<small>${t("Creates {count} flows, numbered {first} down to {last}.", {
+      count: layout.groups.length,
+      first: layout.identifiers[0],
+      last: layout.identifiers[layout.identifiers.length - 1],
+    })}</small>`;
+  } catch {
+    return null;
+  }
+}
+
 function FlowField({ children, label }) {
   return html`<label class="flow-field"><span>${label}</span>${children}</label>`;
 }
@@ -309,6 +340,7 @@ export function TransmitFlows({ device }) {
   const [inventory, setInventory] = useState(null);
   const [error, setError] = useState("");
   const [channels, setChannels] = useState("");
+  const [perFlow, setPerFlow] = useState("");
   const [flowId, setFlowId] = useState("1");
   const [flowName, setFlowName] = useState("");
   const [framesPerPacket, setFramesPerPacket] = useState("");
@@ -343,7 +375,7 @@ export function TransmitFlows({ device }) {
     setError("");
     void refresh();
   }, [requestName]);
-  const specification = () =>
+  const specification = (overrides = {}) =>
     canonicalFlowRequest({
       channels,
       encoding: device.encoding,
@@ -358,12 +390,29 @@ export function TransmitFlows({ device }) {
       sampleRate: device.sample_rate_hz,
       secondaryAddress,
       secondaryPort,
+      ...overrides,
     });
+  // With a channels-per-flow size, the channels are split into several flows,
+  // numbered downwards from the identifier as Dante Controller does.
+  const specifications = () => {
+    const layout = batchLayout(channels, perFlow, flowId);
+    if (!layout) return [specification()];
+    return layout.groups.map((group, index) =>
+      specification({ channels: group, flowId: String(layout.identifiers[index]) }),
+    );
+  };
   const preview = async () => {
     setResult(null);
     try {
-      const response = await api.planTransmitFlow(requestName, specification());
-      setPlan(response.plan);
+      const plans = [];
+      for (const request of specifications()) {
+        plans.push((await api.planTransmitFlow(requestName, request)).plan);
+      }
+      setPlan({
+        supported: plans.every((entry) => entry.supported),
+        reasons: plans.flatMap((entry) => (entry.supported ? [] : entry.reasons)),
+        count: plans.length,
+      });
       setError("");
     } catch (failure) {
       setPlan(null);
@@ -372,8 +421,21 @@ export function TransmitFlows({ device }) {
   };
   const create = async () => {
     try {
-      setResult(await api.createTransmitFlow(requestName, specification()));
-      setError("");
+      const requests = specifications();
+      let created = 0;
+      let last = null;
+      for (const request of requests) {
+        last = await api.createTransmitFlow(requestName, request);
+        // Stop at the first flow that isn't confirmed; earlier ones stay created.
+        if (last?.state !== "confirmed") break;
+        created += 1;
+      }
+      setResult(
+        requests.length > 1
+          ? { ...last, message: t("Created {created} of {count} flows.", { created, count: requests.length }) }
+          : last,
+      );
+      setError(requests.length > 1 && created < requests.length && last?.message ? t(last.message) : "");
     } catch (failure) {
       setError(failure.message);
     } finally {
@@ -431,6 +493,18 @@ export function TransmitFlows({ device }) {
               <${FlowField} label=${t("Transmit channels")}>
                 <input aria-label=${t("Transmit flow channels")} placeholder="1-64" value=${channels} onInput=${edit(setChannels)} />
                 ${channelCount(channels) ? html`<small>${t("Channels: {count}", { count: channelCount(channels) })}</small>` : null}
+              <//>
+              <${FlowField} label=${t("Channels per flow")}>
+                <input
+                  type="number"
+                  min="1"
+                  max="64"
+                  placeholder=${t("All")}
+                  aria-label=${t("Transmit flow channels per flow")}
+                  value=${perFlow}
+                  onInput=${edit(setPerFlow)}
+                />
+                ${batchSummary(channels, perFlow, flowId)}
               <//>
               <${FlowField} label=${{ media_local_flow_id: t("Media-local flow identifier"), global_flow_id: t("Global flow identifier") }[authoring.identity_field] || t("Flow identifier")}>
                 <input
@@ -493,7 +567,9 @@ export function TransmitFlows({ device }) {
                 plan?.supported
                   ? html`<${AsyncButton}
                       variant="primary"
-                      description=${t("create the planned transmit flow on {device}", { device: requestName })}
+                      description=${(plan.count || 1) > 1
+                        ? t("create the planned transmit flows on {device}", { device: requestName })
+                        : t("create the planned transmit flow on {device}", { device: requestName })}
                       onRun=${create}
                       >${t("Create")}<//
                     >`
@@ -502,7 +578,9 @@ export function TransmitFlows({ device }) {
             </div>
             ${error ? html`<p role="alert" class="text-error">${t(error)}</p>` : null}
             ${plan && !plan.supported ? html`<p role="alert" class="text-error">${plan.reasons.map((reason) => t(reason)).join("; ")}</p>` : null}
-            ${plan?.supported ? html`<p role="status">${t("Ready to create.")}</p>` : null}
+            ${plan?.supported
+              ? html`<p role="status">${(plan.count || 1) > 1 ? t("Ready to create {count} flows.", { count: plan.count }) : t("Ready to create.")}</p>`
+              : null}
             ${result ? html`<p role="status">${t(result.message || capitalized(result.state))}</p>` : null}
           </form>`
         : html`${result ? html`<p role="status">${t(result.message || capitalized(result.state))}</p>` : null}`
