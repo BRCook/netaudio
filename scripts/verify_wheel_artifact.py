@@ -166,7 +166,7 @@ def verify_wheel(wheel: Path, platform_name: str, architecture: str) -> None:
             raise RuntimeError("wheel does not declare the netaudio console script")
 
         _verify_native_binary(archive.read(expected_library), platform_name, architecture)
-        for executable in ("netaudio-endpoint", "netaudio-daemon", "netaudio-host-jack", "netaudio-host-pulse"):
+        for executable in ("netaudio-daemon",):
             name = executable + (".exe" if platform_name == "windows" else "")
             member = f"netaudio/bin/{name}"
             if member not in names:

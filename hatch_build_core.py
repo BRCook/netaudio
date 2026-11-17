@@ -78,26 +78,19 @@ class CoreLibraryBuildHook(BuildHookInterface):
 
     def initialize(self, version, build_data):
         crate_dir = Path(self.root) / "packages" / "netaudio-core"
-        binaries = ["netaudio-endpoint", "netaudio-daemon", "netaudio-host-jack", "netaudio-host-pulse"]
+        # This fork ships only the daemon: the native media endpoint and the JACK
+        # and PulseAudio host workers are not built or packaged.
+        binaries = ["netaudio-daemon"]
         cargo = shutil.which("cargo")
-        video_requested = os.environ.get("NETAUDIO_VIDEO", "0")
-        if video_requested not in {"0", "1"}:
-            raise RuntimeError("NETAUDIO_VIDEO must be 0 or 1")
-        target = self._cargo_target()
-        linux_target = "-linux-" in target if target else sys.platform.startswith("linux")
-        default_audio_backends = "jack" if linux_target else ""
-        audio_backends = [
-            value.strip()
-            for value in os.environ.get("NETAUDIO_AUDIO_BACKENDS", default_audio_backends).split(",")
-            if value.strip()
-        ]
-        unsupported_backends = set(audio_backends) - {"jack", "pulseaudio", "pipewire", "asio"}
-        if unsupported_backends:
-            raise RuntimeError(f"Unknown native audio build backends: {', '.join(sorted(unsupported_backends))}")
-        if (video_requested == "1" or audio_backends) and cargo is None:
-            raise RuntimeError("Building selected media backends requires Cargo and their development libraries")
+        if (
+            os.environ.get("NETAUDIO_VIDEO", "0") not in {"", "0"}
+            or os.environ.get("NETAUDIO_AUDIO_BACKENDS", "").strip()
+        ):
+            raise RuntimeError(
+                "This build doesn't include the native audio and video endpoint; "
+                "unset NETAUDIO_VIDEO and NETAUDIO_AUDIO_BACKENDS"
+            )
         if cargo is not None:
-            features = sorted(set(audio_backends) | ({"video"} if video_requested == "1" else set()))
             command = [
                 cargo,
                 "build",
@@ -112,8 +105,6 @@ class CoreLibraryBuildHook(BuildHookInterface):
             ]
             for binary in binaries:
                 command.extend(["-p", binary])
-            if features:
-                command.extend(["--features", ",".join(f"netaudio-endpoint/{feature}" for feature in features)])
             subprocess.run(command, check=True)
         library_path = self._find_library(crate_dir)
         if library_path is None:
