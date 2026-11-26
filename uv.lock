@@ -3,11 +3,11 @@ revision = 5
 requires-python = ">=3.10"
 resolution-markers = [
     "python_full_version >= '3.12' and platform_machine == 'x86_64' and sys_platform == 'darwin'",
-    "(python_full_version >= '3.12' and platform_machine != 'x86_64') or (python_full_version >= '3.12' and sys_platform != 'darwin')",
+    "python_full_version >= '3.12' and (platform_machine != 'x86_64' or sys_platform != 'darwin')",
     "python_full_version == '3.11.*' and platform_machine == 'x86_64' and sys_platform == 'darwin'",
-    "(python_full_version == '3.11.*' and platform_machine != 'x86_64') or (python_full_version == '3.11.*' and sys_platform != 'darwin')",
+    "python_full_version == '3.11.*' and (platform_machine != 'x86_64' or sys_platform != 'darwin')",
     "python_full_version < '3.11' and platform_machine == 'x86_64' and sys_platform == 'darwin'",
-    "(python_full_version < '3.11' and platform_machine != 'x86_64') or (python_full_version < '3.11' and sys_platform != 'darwin')",
+    "python_full_version < '3.11' and (platform_machine != 'x86_64' or sys_platform != 'darwin')",
 ]
 
 [[package]]
@@ -153,9 +153,9 @@ name = "cryptography"
 version = "50.0.2"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "(python_full_version >= '3.12' and platform_machine != 'x86_64') or (python_full_version >= '3.12' and sys_platform != 'darwin')",
-    "(python_full_version == '3.11.*' and platform_machine != 'x86_64') or (python_full_version == '3.11.*' and sys_platform != 'darwin')",
-    "(python_full_version < '3.11' and platform_machine != 'x86_64') or (python_full_version < '3.11' and sys_platform != 'darwin')",
+    "python_full_version >= '3.12' and (platform_machine != 'x86_64' or sys_platform != 'darwin')",
+    "python_full_version == '3.11.*' and (platform_machine != 'x86_64' or sys_platform != 'darwin')",
+    "python_full_version < '3.11' and (platform_machine != 'x86_64' or sys_platform != 'darwin')",
 ]
 dependencies = [
     { name = "cffi", marker = "platform_python_implementation != 'PyPy'" },
@@ -327,7 +327,7 @@ wheels = [
 
 [[package]]
 name = "netaudio"
-version = "2.0.6"
+version = "2.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
@@ -417,7 +417,7 @@ name = "numpy"
 version = "2.2.6"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "(python_full_version < '3.11' and platform_machine != 'x86_64') or (python_full_version < '3.11' and sys_platform != 'darwin')",
+    "python_full_version < '3.11' and (platform_machine != 'x86_64' or sys_platform != 'darwin')",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/76/21/7d2a95e4bba9dc13d043ee156a356c0a8f0c6309dff6b21b4d71a073b8a8/numpy-2.2.6.tar.gz", hash = "sha256:e29554e2bef54a90aa5cc07da6ce955accb83f21ab5de01a62c8478897b264fd", size = 20276440, upload-time = "2025-05-17T22:38:04.611Z" }
 wheels = [
@@ -449,7 +449,7 @@ name = "numpy"
 version = "2.4.6"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "(python_full_version == '3.11.*' and platform_machine != 'x86_64') or (python_full_version == '3.11.*' and sys_platform != 'darwin')",
+    "python_full_version == '3.11.*' and (platform_machine != 'x86_64' or sys_platform != 'darwin')",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d0/ad/fed0499ce6a338d2a03ebae59cd15093910c8875328855781952abf6c2fe/numpy-2.4.6.tar.gz", hash = "sha256:f3a3570c4a2a16746ac2c31a7c7c7b0c186b95ce902e33db6f28094ed7387dda", size = 20735807, upload-time = "2026-05-18T23:37:14.07Z" }
 wheels = [
@@ -486,7 +486,7 @@ name = "numpy"
 version = "2.5.3"
 source = { registry = "https://pypi.org/simple" }
 resolution-markers = [
-    "(python_full_version >= '3.12' and platform_machine != 'x86_64') or (python_full_version >= '3.12' and sys_platform != 'darwin')",
+    "python_full_version >= '3.12' and (platform_machine != 'x86_64' or sys_platform != 'darwin')",
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/13/01/11703282db468b85f6f7b8c7f22d058de5970d5c7e60a3a8aaa313c3de36/numpy-2.5.3.tar.gz", hash = "sha256:df2d5874ff183595a4ba404edd04f6bd9b5505c1d7708573f6a6c17489a67563", size = 20791231, upload-time = "2026-09-06T16:27:47.073Z" }
 wheels = [
