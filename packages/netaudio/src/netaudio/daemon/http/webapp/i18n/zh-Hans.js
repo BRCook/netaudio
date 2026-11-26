@@ -90,6 +90,8 @@ export default {
   "Sample rate": "采样率",
   "Encoding": "编码",
   "Flow performance": "流性能",
+  "Device latency (receive and unicast)": "设备延迟（接收和单播）",
+  "Multicast latency may not go below the unicast latency ({latency} ms).": "组播延迟可能不能低于单播延迟（{latency} ms）。",
   "Enter a latency in milliseconds and a whole number of frames per packet.": "请输入以毫秒为单位的延迟和整数的每包帧数。",
   "Latency must be between {minimum} and {maximum} ms.": "延迟必须在 {minimum} 到 {maximum} ms 之间。",
   "ms": "ms",

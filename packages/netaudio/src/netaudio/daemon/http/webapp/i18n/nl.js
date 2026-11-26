@@ -90,6 +90,8 @@ export default {
   "Sample rate": "Samplefrequentie",
   "Encoding": "Codering",
   "Flow performance": "Flowprestaties",
+  "Device latency (receive and unicast)": "Apparaatlatentie (ontvangst en unicast)",
+  "Multicast latency may not go below the unicast latency ({latency} ms).": "De multicastlatentie mag mogelijk niet lager zijn dan de unicastlatentie ({latency} ms).",
   "Enter a latency in milliseconds and a whole number of frames per packet.": "Voer een latentie in milliseconden en een geheel aantal frames per pakket in.",
   "Latency must be between {minimum} and {maximum} ms.": "De latentie moet tussen {minimum} en {maximum} ms liggen.",
   "ms": "ms",

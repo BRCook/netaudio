@@ -90,6 +90,8 @@ export default {
   "Sample rate": "மாதிரி வீதம்",
   "Encoding": "குறியாக்கம்",
   "Flow performance": "ஓட்ட செயல்திறன்",
+  "Device latency (receive and unicast)": "சாதனத் தாமதம் (பெறுதல் மற்றும் யூனிகாஸ்ட்)",
+  "Multicast latency may not go below the unicast latency ({latency} ms).": "மல்டிகாஸ்ட் தாமதம் யூனிகாஸ்ட் தாமதத்தை ({latency} ms) விடக் குறைவாக இருக்க முடியாமல் போகலாம்.",
   "Enter a latency in milliseconds and a whole number of frames per packet.": "தாமதத்தை மில்லிவினாடிகளிலும் ஒரு பாக்கெட்டுக்கான ஃப்ரேம்களை முழு எண்ணாகவும் உள்ளிடவும்.",
   "Latency must be between {minimum} and {maximum} ms.": "தாமதம் {minimum} முதல் {maximum} ms வரை இருக்க வேண்டும்.",
   "ms": "ms",

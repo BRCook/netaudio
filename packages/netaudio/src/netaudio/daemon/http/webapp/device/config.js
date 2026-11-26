@@ -550,6 +550,9 @@ function PerformanceSetting({ device, requestName, setting }) {
       ${framesMinimum !== null && framesMaximum !== null
         ? ` ${t("This device accepts {minimum} to {maximum} frames per packet.", { minimum: framesMinimum, maximum: framesMaximum })}`
         : null}
+      ${setting.operation === "transmit_flow_performance" && Number.isFinite(stored["33285"])
+        ? ` ${t("Multicast latency may not go below the unicast latency ({latency} ms).", { latency: stored["33285"] / 1000000 })}`
+        : null}
     </p>
   `;
 }
@@ -582,13 +585,13 @@ function LatencyControl({ device }) {
   const current = device.configured_latency_ms ?? device.latency_ms;
   if (!choices.length && !hasRange) return null;
   return html`
-    <${FieldRow} label=${t("Latency")}>
+    <${FieldRow} label=${t("Device latency (receive and unicast)")}>
       ${
         choices.length
           ? html`<select
               key=${`latency-${requestName}`}
               ref=${control}
-              aria-label=${t("Latency")}
+              aria-label=${t("Device latency (receive and unicast)")}
               onChange=${(event) => setCustom(event.currentTarget.value === "custom")}
             >
               ${choices.map(

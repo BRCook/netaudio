@@ -90,6 +90,8 @@ export default {
   "Sample rate": "採樣率",
   "Encoding": "編碼",
   "Flow performance": "串流效能",
+  "Device latency (receive and unicast)": "裝置延遲（接收與單播）",
+  "Multicast latency may not go below the unicast latency ({latency} ms).": "多播延遲可能無法低於單播延遲（{latency} ms）。",
   "Enter a latency in milliseconds and a whole number of frames per packet.": "請輸入以毫秒為單位的延遲與整數的每封包影格數。",
   "Latency must be between {minimum} and {maximum} ms.": "延遲必須介於 {minimum} 到 {maximum} ms 之間。",
   "ms": "ms",

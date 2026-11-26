@@ -90,6 +90,8 @@ export default {
   "Sample rate": "サンプルレート",
   "Encoding": "エンコーディング",
   "Flow performance": "フローのパフォーマンス",
+  "Device latency (receive and unicast)": "デバイスのレイテンシー（受信とユニキャスト）",
+  "Multicast latency may not go below the unicast latency ({latency} ms).": "マルチキャストのレイテンシーはユニキャストのレイテンシー（{latency} ms）より低くできない場合があります。",
   "Enter a latency in milliseconds and a whole number of frames per packet.": "レイテンシーをミリ秒で、パケットあたりのフレーム数を整数で入力してください。",
   "Latency must be between {minimum} and {maximum} ms.": "レイテンシーは{minimum}～{maximum} msの範囲で指定してください。",
   "ms": "ms",

@@ -90,6 +90,8 @@ export default {
   "Sample rate": "Frequenza di campionamento",
   "Encoding": "Codifica",
   "Flow performance": "Prestazioni dei flussi",
+  "Device latency (receive and unicast)": "Latenza del dispositivo (ricezione e unicast)",
+  "Multicast latency may not go below the unicast latency ({latency} ms).": "La latenza multicast non può scendere sotto la latenza unicast ({latency} ms).",
   "Enter a latency in milliseconds and a whole number of frames per packet.": "Inserisci una latenza in millisecondi e un numero intero di frame per pacchetto.",
   "Latency must be between {minimum} and {maximum} ms.": "La latenza deve essere tra {minimum} e {maximum} ms.",
   "ms": "ms",

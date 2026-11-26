@@ -90,6 +90,8 @@ export default {
   "Sample rate": "샘플 레이트",
   "Encoding": "인코딩",
   "Flow performance": "플로 성능",
+  "Device latency (receive and unicast)": "장치 지연 시간(수신 및 유니캐스트)",
+  "Multicast latency may not go below the unicast latency ({latency} ms).": "멀티캐스트 지연 시간은 유니캐스트 지연 시간({latency} ms)보다 낮출 수 없을 수 있습니다.",
   "Enter a latency in milliseconds and a whole number of frames per packet.": "지연 시간을 밀리초로, 패킷당 프레임 수를 정수로 입력하세요.",
   "Latency must be between {minimum} and {maximum} ms.": "지연 시간은 {minimum}~{maximum} ms 사이여야 합니다.",
   "ms": "ms",

@@ -90,6 +90,8 @@ export default {
   "Sample rate": "Kadar sampel",
   "Encoding": "Pengekodan",
   "Flow performance": "Prestasi aliran",
+  "Device latency (receive and unicast)": "Kependaman peranti (terima dan unicast)",
+  "Multicast latency may not go below the unicast latency ({latency} ms).": "Kependaman multicast mungkin tidak boleh kurang daripada kependaman unicast ({latency} ms).",
   "Enter a latency in milliseconds and a whole number of frames per packet.": "Masukkan kependaman dalam milisaat dan nombor bulat bingkai setiap paket.",
   "Latency must be between {minimum} and {maximum} ms.": "Kependaman mesti antara {minimum} dan {maximum} ms.",
   "ms": "ms",
