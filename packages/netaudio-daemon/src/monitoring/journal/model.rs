@@ -5,6 +5,10 @@ use serde_json::{Map, Value, json};
 
 pub const SCHEMA_VERSION: u32 = 1;
 pub const DEFAULT_VIEW_LIMIT: usize = 1000;
+/// Events kept in the journal file; older ones are deleted.
+pub const DEFAULT_RETENTION: usize = 100_000;
+/// Space the journal's events may occupy before the oldest are deleted early.
+pub const DEFAULT_MAXIMUM_MEGABYTES: u64 = 1024;
 const LATENCY_WARNING_RATIO: f64 = 0.8;
 const LATENCY_RECOVERY_RATIO: f64 = 0.6;
 const UTILIZATION_WARNING_PERCENT: f64 = 80.0;

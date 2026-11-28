@@ -14,6 +14,8 @@ mod index;
 
 const DATABASE_LAYOUT: &str = "2";
 const DATABASE_BUSY_DEADLINE: Duration = Duration::from_secs(2);
+/// Old events are trimmed whenever this many new ones have been written.
+const RETENTION_INTERVAL: u64 = 500;
 const NEXT_SEQUENCE_KEY: &str = "next_sequence";
 const STOPPED_AT_KEY: &str = "stopped_at";
 const SCHEMA: &str = "
@@ -36,6 +38,8 @@ pub struct JournalDatabase {
     connection: Connection,
     next_sequence: u64,
     view_limit: usize,
+    retention: usize,
+    maximum_bytes: u64,
     overview: Option<Arc<Overview>>,
 }
 
@@ -88,8 +92,12 @@ impl JournalDatabase {
         Ok(())
     }
 
-    pub fn open(path: &Path, view_limit: usize) -> Result<Self> {
+    pub fn open(path: &Path, view_limit: usize, retention: usize, maximum_bytes: u64) -> Result<Self> {
         ensure!(view_limit != 0, "event_history_limit must be positive");
+        ensure!(
+            retention >= view_limit,
+            "event_journal_retention must be at least event_history_limit"
+        );
 
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -199,8 +207,61 @@ impl JournalDatabase {
             connection,
             next_sequence,
             view_limit,
+            retention,
+            maximum_bytes,
             overview: None,
         })
+    }
+
+    /// Keeps the newest `retention` events, and fewer when the file's used
+    /// space passes `maximum_bytes`. Without this the journal grew for as long
+    /// as the daemon ran (4.5 GB in three weeks on a busy link); SQLite reuses
+    /// the freed pages, so the file stops growing.
+    fn trim(
+        transaction: &rusqlite::Transaction<'_>,
+        next: u64,
+        retention: usize,
+        maximum_bytes: u64,
+    ) -> Result<()> {
+        if let Some(cutoff) = next.checked_sub(retention as u64) {
+            Self::delete_before(transaction, cutoff)?;
+        }
+
+        let pragma = |name: &str| -> Result<u64> {
+            let value: i64 = transaction.query_row(&format!("PRAGMA {name}"), [], |row| row.get(0))?;
+            Ok(u64::try_from(value).unwrap_or(0))
+        };
+        let used = pragma("page_count")?.saturating_sub(pragma("freelist_count")?) * pragma("page_size")?;
+        if used > maximum_bytes {
+            // Over the size limit: drop the oldest share of events in proportion
+            // to the excess, plus a margin, and check again at the next trim.
+            let (oldest, count): (Option<i64>, i64) = transaction.query_row(
+                "SELECT min(sequence), count(*) FROM events",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )?;
+            if let Some(oldest) = oldest {
+                let share = 1.0 - maximum_bytes as f64 / used as f64 + 0.05;
+                let remove = ((count as f64) * share).ceil() as u64;
+                let oldest = u64::try_from(oldest).unwrap_or(0);
+                Self::delete_before(transaction, oldest.saturating_add(remove))?;
+            }
+        }
+        Ok(())
+    }
+
+    fn delete_before(transaction: &rusqlite::Transaction<'_>, cutoff: u64) -> Result<()> {
+        let cutoff = i64::try_from(cutoff).context("journal event sequence exhausted")?;
+        transaction.execute(
+            "DELETE FROM native_journal_event_devices WHERE sequence < ?1",
+            [cutoff],
+        )?;
+        transaction.execute(
+            "DELETE FROM native_journal_event_index WHERE sequence < ?1",
+            [cutoff],
+        )?;
+        transaction.execute("DELETE FROM events WHERE sequence < ?1", [cutoff])?;
+        Ok(())
     }
 
     pub fn append(&mut self, events: Vec<JournalEvent>) -> Result<Vec<JournalEvent>> {
@@ -325,6 +386,9 @@ impl JournalDatabase {
         )?;
         transaction.execute("UPDATE layout SET saved_at = ?1", [wall_time()])?;
         issues::store::persist(&transaction, changes)?;
+        if self.next_sequence / RETENTION_INTERVAL != next / RETENTION_INTERVAL {
+            Self::trim(&transaction, next, self.retention, self.maximum_bytes)?;
+        }
         transaction.commit()?;
         self.next_sequence = next;
         self.overview = None;

@@ -147,10 +147,38 @@ pub async fn run(
         })
         .transpose()?
         .unwrap_or(crate::monitoring::journal::model::DEFAULT_VIEW_LIMIT);
+    let journal_retention = configuration
+        .daemon
+        .get("event_journal_retention")
+        .map(|value| {
+            value
+                .as_integer()
+                .and_then(|value| usize::try_from(value).ok())
+                .filter(|value| *value != 0)
+                .context("daemon.event_journal_retention must be a positive integer")
+        })
+        .transpose()?
+        .unwrap_or(crate::monitoring::journal::model::DEFAULT_RETENTION)
+        .max(journal_limit);
+    let journal_maximum_bytes = configuration
+        .daemon
+        .get("event_journal_maximum_megabytes")
+        .map(|value| {
+            value
+                .as_integer()
+                .and_then(|value| u64::try_from(value).ok())
+                .filter(|value| *value != 0)
+                .context("daemon.event_journal_maximum_megabytes must be a positive integer")
+        })
+        .transpose()?
+        .unwrap_or(crate::monitoring::journal::model::DEFAULT_MAXIMUM_MEGABYTES)
+        .saturating_mul(1024 * 1024);
     let (journal, journal_worker) = crate::monitoring::journal::service::Journal::open(
         &configuration.event_journal_path()?,
         Arc::clone(&model),
         journal_limit,
+        journal_retention,
+        journal_maximum_bytes,
         crate::monitoring::journal::model::Thresholds::from_configuration(&configuration.daemon)?,
     )
     .await?;

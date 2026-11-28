@@ -113,11 +113,13 @@ impl Journal {
         path: &Path,
         model: Arc<ReadModel>,
         view_limit: usize,
+        retention: usize,
+        maximum_bytes: u64,
         thresholds: Thresholds,
     ) -> Result<(Arc<Self>, Worker)> {
         let path = path.to_owned();
         let (database, restored, remembered) = tokio::task::spawn_blocking(move || {
-            let mut database = JournalDatabase::open(&path, view_limit)?;
+            let mut database = JournalDatabase::open(&path, view_limit, retention, maximum_bytes)?;
             let restored = database.restore_issues()?;
             let remembered = remembered::Inventory::load(&database)?;
             Ok::<_, anyhow::Error>((database, restored, remembered))

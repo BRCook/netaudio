@@ -23,6 +23,7 @@ NetAudio discovers, routes, configures and monitors Dante network audio devices 
 | Create several multicast flows at once (`flow create-batch`, Channels per flow) | CLI and web UI |
 | Patch one device to another 1:1 in one step (Routing → Patch 1:1) | Web UI |
 | Ship only the daemon: no native audio/video endpoint or JACK/PulseAudio host workers | Packaging |
+| Keep the event journal within 100,000 events or 1 GB (`event_journal_retention`, `event_journal_maximum_megabytes`) | Daemon |
 | Remove the iOS and iPadOS app packaging | Repository |
 
 The flow changes apply only to devices advertising protocol 0x280C, and the PTPv2 setting is only offered where the device's clock status reports support for it. Other devices behave as they do upstream.
@@ -161,6 +162,8 @@ netaudio --log-level DEBUG daemon run
 ```
 
 The browser's Events page keeps recent events and issues in memory, and restarting the daemon clears them. Save them first with `netaudio events export --file events.json`.
+
+The event journal on disk keeps the newest 100,000 events, and deletes older ones sooner if the events take up more than 1 GB, so it no longer grows without limit. Set `event_journal_retention` (events) and `event_journal_maximum_megabytes` under `[daemon]` to change either limit.
 
 ## Background
 
